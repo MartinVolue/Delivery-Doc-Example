@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delivery Documentation</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f5f7fa;color:#1c2b3a;font-size:14px;min-height:100vh}
+
+/* ── TEST BANNER ── */
+#test-banner{background:#7f1d1d;color:#fff;padding:10px 20px;text-align:center;font-size:13px;border-bottom:3px solid #991b1b;line-height:1.6}
+#test-banner strong{font-size:13px;font-weight:700}
+
+/* ── TOPBAR ── */
+.topbar{background:#0f2240;padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:54px}
+.topbar-left{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.brand{color:#1d9e75;font-weight:700;font-size:16px;letter-spacing:.1em}
+.topbar-appname{color:rgba(255,255,255,.7);font-size:13px}
+.topbar-right{display:flex;align-items:center;gap:8px}
+
+/* ── LANGUAGE SWITCHER ── */
+.lang-bar{display:flex;gap:4px;background:rgba(255,255,255,.12);border-radius:10px;padding:5px;border:1px solid rgba(255,255,255,.25)}
+.lang-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);cursor:pointer;font-size:20px;padding:5px 9px;border-radius:7px;opacity:1;transition:all .15s;line-height:1;display:flex;align-items:center;gap:5px;color:#fff}
+.lang-btn span.lang-code{font-size:11px;font-weight:700;color:rgba(255,255,255,.9);letter-spacing:.04em}
+.lang-btn:hover{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.4)}
+.lang-btn.active{background:#1d9e75;border-color:#1d9e75;box-shadow:0 0 0 2px rgba(29,158,117,.4)}
+.lang-btn.active span.lang-code{color:#fff}
+
+.topbar-actions{display:flex;gap:6px;align-items:center}
+.save-msg{font-size:12px;font-weight:600;color:#1d9e75;min-width:70px;text-align:right}
+.save-msg.err{color:#f87171}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:#718099;flex-shrink:0}
+.conn-dot.ok{background:#1d9e75}
+.conn-dot.err{background:#f87171}
+
+/* ── BUTTONS ── */
+.btn{padding:6px 13px;font-size:12px;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:500;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;white-space:nowrap;transition:background .15s}
+.btn:hover{background:rgba(255,255,255,.2)}
+.btn-teal{background:#1d9e75;border-color:#1d9e75;color:#fff}
+.btn-teal:hover{background:#0f8060}
+.btn-outline{background:none;border:1px solid #dde3ec;color:#1c2b3a;border-radius:6px;padding:7px 16px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:500;transition:background .15s}
+.btn-outline:hover{background:#f5f7fa}
+.btn-navy{background:#0f2240;border:1px solid #0f2240;color:#fff;border-radius:6px;padding:7px 16px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:500}
+.btn-navy:hover{background:#1a3a60}
+.btn-lg{padding:13px 28px;font-size:15px;font-weight:600;border-radius:8px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:10px;border:none;transition:all .15s}
+.btn-lg-primary{background:#1d9e75;color:#fff}
+.btn-lg-primary:hover{background:#0f8060;transform:translateY(-1px)}
+.btn-remove{padding:5px 8px;border:1px solid #dde3ec;border-radius:6px;background:none;cursor:pointer;color:#e05555;font-size:13px;flex-shrink:0}
+.btn-remove:hover{background:#fff0f0}
+.btn-add{padding:6px 12px;font-size:12px;border:1px solid #dde3ec;border-radius:6px;background:none;cursor:pointer;color:#1c2b3a;font-family:inherit}
+.btn-add:hover{background:#f0faf6;border-color:#1d9e75;color:#1d9e75}
+
+/* ── LAYOUT ── */
+.content{max-width:900px;margin:0 auto;padding:20px}
+.view{display:none}.view.active{display:block}
+
+/* ── HOME PAGE ── */
+.home-hero{background:linear-gradient(135deg,#0f2240 0%,#1a3a60 100%);border-radius:14px;padding:36px 40px;color:#fff;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+@media(max-width:640px){.home-hero{flex-direction:column;padding:28px 24px;text-align:center}}
+.home-hero-text h1{font-size:22px;font-weight:600;margin-bottom:8px;color:#fff}
+.home-hero-text p{font-size:14px;color:rgba(255,255,255,.7);line-height:1.6;max-width:400px}
+.home-hero-cta{flex-shrink:0}
+.home-stats{display:flex;gap:12px;margin-top:16px}
+.home-stat{background:rgba(255,255,255,.1);border-radius:8px;padding:10px 16px;text-align:center}
+.home-stat-num{font-size:22px;font-weight:700;color:#1d9e75}
+.home-stat-lbl{font-size:11px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.04em}
+
+/* ── SEARCH PANEL ── */
+.search-panel{background:#fff;border:1px solid #dde3ec;border-radius:12px;overflow:hidden;margin-bottom:20px}
+.search-panel-header{padding:14px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;border-bottom:1px solid transparent;transition:background .15s}
+.search-panel-header:hover{background:#f9fafb}
+.search-panel-header.open{border-bottom-color:#dde3ec}
+.search-panel-title{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;color:#1c2b3a}
+.search-panel-chevron{font-size:13px;color:#718099;transition:transform .2s}
+.search-panel-chevron.open{transform:rotate(180deg)}
+.search-panel-body{padding:16px 20px}
+.search-input-wrap{position:relative;margin-bottom:14px}
+.search-input-wrap input{width:100%;padding:11px 42px 11px 14px;font-size:14px;border:1px solid #dde3ec;border-radius:8px;outline:none;font-family:inherit;color:#1c2b3a;transition:border-color .15s}
+.search-input-wrap input:focus{border-color:#1d9e75}
+.search-input-wrap .search-icon{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:16px;color:#718099;pointer-events:none}
+.search-hint{font-size:11px;color:#9eaabf;margin-top:-10px;margin-bottom:14px}
+.search-results{display:grid;gap:8px}
+.search-result-card{background:#f9fafb;border:1px solid #eef0f4;border-radius:8px;padding:12px 16px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.search-result-card:hover{border-color:#1d9e75;background:#f0faf6}
+.sr-left .sr-name{font-weight:600;font-size:14px;margin-bottom:3px}
+.sr-left .sr-meta{font-size:12px;color:#718099;display:flex;flex-wrap:wrap;gap:6px}
+.sr-meta-chip{background:#fff;border:1px solid #eef0f4;border-radius:4px;padding:1px 6px}
+.sr-actions{display:flex;gap:6px;flex-shrink:0}
+.no-results{text-align:center;padding:24px;color:#9eaabf;font-size:13px}
+
+/* ── RECENT DOCS ── */
+.section-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#718099;margin-bottom:10px}
+.recent-grid{display:grid;gap:8px}
+.recent-card{background:#fff;border:1px solid #dde3ec;border-radius:10px;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;transition:all .15s}
+.recent-card:hover{border-color:#1d9e75;background:#f0faf6}
+.recent-name{font-weight:600;font-size:14px;margin-bottom:3px}
+.recent-meta{font-size:12px;color:#718099}
+.recent-arrow{color:#9eaabf;font-size:18px;flex-shrink:0}
+
+/* ── FORM ── */
+.form-topbar{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #dde3ec}
+.back-btn{background:none;border:none;cursor:pointer;color:#718099;font-size:13px;display:flex;align-items:center;gap:6px;padding:0;font-family:inherit}
+.back-btn:hover{color:#1c2b3a}
+.form-title{font-size:16px;font-weight:600;color:#1c2b3a}
+.english-note{background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px}
+.section-card{background:#fff;border:1px solid #dde3ec;border-radius:10px;margin-bottom:12px;overflow:hidden}
+.section-head{padding:9px 18px;background:#f7f8fa;border-bottom:1px solid #dde3ec;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#718099}
+.section-body{padding:16px 18px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+@media(max-width:600px){.grid-2{grid-template-columns:1fr}}
+.field{margin-bottom:13px;position:relative}
+.field label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#718099;margin-bottom:5px}
+.field .hint{font-size:11px;color:#9eaabf;margin-top:3px}
+input[type=text],input[type=email],input[type=date],textarea{width:100%;padding:8px 11px;font-size:13px;font-family:inherit;border:1px solid #dde3ec;border-radius:6px;background:#fff;color:#1c2b3a;outline:none;transition:border-color .15s}
+input:focus,textarea:focus{border-color:#1d9e75}
+textarea{resize:vertical;line-height:1.6}
+.url-row{display:flex;gap:7px;margin-bottom:7px;align-items:center}
+.url-row .url-desc{flex:0 0 160px}
+.url-row .url-href{flex:1}
+.cf-row{display:flex;gap:7px;margin-bottom:7px;align-items:flex-start}
+.cf-row .cf-lbl{flex:0 0 150px}
+.cf-row .cf-val{flex:1}
+.form-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+
+/* ── AUTOCOMPLETE ── */
+.ac-dropdown{position:absolute;top:calc(100% - 13px);left:0;right:0;background:#fff;border:1px solid #1d9e75;border-top:none;border-radius:0 0 8px 8px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:200;max-height:180px;overflow-y:auto}
+.ac-item{padding:9px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f5f7fa}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover{background:#f0faf6}
+.ac-item-sub{font-size:11px;color:#9eaabf;margin-top:1px}
+.autofill-banner{background:#e6f7f0;border:1px solid #1d9e75;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.autofill-banner-text{color:#0f4d35;line-height:1.5}
+.autofill-banner-actions{display:flex;gap:6px;flex-shrink:0}
+.autofill-dismiss{background:none;border:none;cursor:pointer;color:#9eaabf;font-size:16px;padding:2px;line-height:1}
+
+/* ── PREVIEW ── */
+.preview-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.preview-doc{background:#fff;border:1px solid #dde3ec;border-radius:12px;padding:44px 52px;margin-bottom:16px}
+@media(max-width:640px){.preview-doc{padding:24px 20px}}
+.doc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:20px;border-bottom:3px solid #0f2240}
+.doc-brand{font-size:10px;font-weight:700;letter-spacing:.14em;color:#1d9e75;margin-bottom:4px}
+.doc-title{font-size:21px;font-weight:600;color:#0f2240;margin-bottom:3px}
+.doc-subtitle{font-size:14px;color:#718099}
+.doc-meta{text-align:right}
+.doc-meta-date{font-size:13px;font-weight:600;color:#1c2b3a;margin-bottom:2px}
+.doc-meta-customer{font-size:12px;color:#718099}
+.doc-section{margin-bottom:22px}
+.doc-section-title{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#0f6e56;border-bottom:2px solid #1d9e75;padding-bottom:6px;margin-bottom:12px}
+.doc-row{display:flex;margin-bottom:8px;padding-bottom:8px;border-bottom:.5px solid #eef0f4;font-size:13px}
+.doc-row:last-child{border-bottom:none;padding-bottom:0;margin-bottom:0}
+.doc-label{width:200px;flex-shrink:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#9eaabf;padding-top:2px}
+.doc-value{flex:1;color:#1c2b3a;white-space:pre-wrap;line-height:1.65}
+.doc-freetext{font-size:13px;line-height:1.8;white-space:pre-wrap;color:#1c2b3a}
+.doc-url-row{display:flex;margin-bottom:7px;font-size:13px}
+.doc-url-label{width:200px;flex-shrink:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#9eaabf}
+.doc-url-row a{color:#0f6e56;word-break:break-all}
+.doc-footer{margin-top:36px;padding-top:12px;border-top:.5px solid #eef0f4;display:flex;justify-content:space-between;font-size:11px;color:#9eaabf}
+.doc-footer-brand{color:#1d9e75;font-weight:700;letter-spacing:.08em}
+
+/* ── EMPTY / LOADING ── */
+.empty-state{text-align:center;padding:40px 0;color:#9eaabf;font-size:14px}
+.loading-state{text-align:center;padding:24px 0;color:#9eaabf;font-size:13px}
+
+/* ── PRINT ── */
+@media print{
+  #test-banner,.no-print{display:none!important}
+  body{background:#fff}
+  .preview-doc{border:none;padding:0;border-radius:0}
+  .content{padding:0;max-width:100%}
+  @page{margin:18mm}
+}
+</style>
+</head>
+<body>
+
+<div id="test-banner">
+  <strong>⚠️ TEST ENVIRONMENT — Do not enter confidential data, real passwords, or customer data. For testing only.</strong>
+</div>
+
+<!-- ── TOPBAR ── -->
+<div class="topbar no-print">
+  <div class="topbar-left" onclick="showView('home')">
+    <span class="brand" id="brand-name">MY COMPANY</span>
+    <span class="topbar-appname" id="topbar-appname">Delivery Docs</span>
+  </div>
+  <div class="topbar-right">
+    <!-- LANGUAGE SWITCHER — prominent -->
+    <div class="lang-bar">
+      <button class="lang-btn" data-lang="no" onclick="setLang('no')" title="Norsk">🇳🇴<span class="lang-code">NO</span></button>
+      <button class="lang-btn" data-lang="sv" onclick="setLang('sv')" title="Svenska">🇸🇪<span class="lang-code">SV</span></button>
+      <button class="lang-btn" data-lang="da" onclick="setLang('da')" title="Dansk">🇩🇰<span class="lang-code">DA</span></button>
+      <button class="lang-btn active" data-lang="en" onclick="setLang('en')" title="English">🇬🇧<span class="lang-code">EN</span></button>
+      <button class="lang-btn" data-lang="de" onclick="setLang('de')" title="Deutsch">🇩🇪<span class="lang-code">DE</span></button>
+      <button class="lang-btn" data-lang="pl" onclick="setLang('pl')" title="Polski">🇵🇱<span class="lang-code">PL</span></button>
+    </div>
+    <div class="topbar-actions">
+      <div class="conn-dot" id="conn-dot" title="Database status"></div>
+      <span class="save-msg" id="save-msg"></span>
+      <button class="btn btn-teal" onclick="saveDoc()" id="btn-save" style="display:none">💾 <span id="t-save">Save</span></button>
+      <button class="btn" onclick="window.print()" id="btn-print" style="display:none">🖨️ <span id="t-print">Print</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ HOME VIEW ════════════ -->
+<div class="view active" id="view-home">
+  <div class="content">
+
+    <!-- Hero -->
+    <div class="home-hero">
+      <div class="home-hero-text">
+        <h1 id="home-title">Delivery Documentation</h1>
+        <p id="home-desc">Create technical handover documentation for every delivery. Searchable, structured, shareable.</p>
+        <div class="home-stats">
+          <div class="home-stat">
+            <div class="home-stat-num" id="stat-total">–</div>
+            <div class="home-stat-lbl" id="t-stat-docs">Documents</div>
+          </div>
+          <div class="home-stat">
+            <div class="home-stat-num" id="stat-customers">–</div>
+            <div class="home-stat-lbl" id="t-stat-customers">Customers</div>
+          </div>
+        </div>
+      </div>
+      <div class="home-hero-cta">
+        <button class="btn-lg btn-lg-primary" onclick="newDoc()">
+          <span style="font-size:20px">+</span>
+          <span id="t-new-doc">New Document</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search panel -->
+    <div class="search-panel">
+      <div class="search-panel-header open" id="search-header" onclick="toggleSearch()">
+        <div class="search-panel-title">
+          <span>🔍</span>
+          <span id="t-search-title">Find Documentation</span>
+        </div>
+        <span class="search-panel-chevron open" id="search-chevron">▼</span>
+      </div>
+      <div class="search-panel-body" id="search-body">
+        <div class="search-input-wrap">
+          <input type="text" id="search-input"
+            placeholder="Search project, customer, consultant, server, URL..."
+            oninput="handleSearch(this.value)" autocomplete="off">
+          <span class="search-icon">🔍</span>
+        </div>
+        <p class="search-hint" id="t-search-hint">Fuzzy search across project name, number, customer, consultant, server name and URLs.</p>
+        <div id="search-results" class="search-results"></div>
+      </div>
+    </div>
+
+    <!-- Recent documents -->
+    <div id="recent-section">
+      <div class="section-title" id="t-recent">Recent Documents</div>
+      <div class="recent-grid" id="recent-docs">
+        <div class="loading-state" id="t-loading">Loading...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════ FORM VIEW ════════════ -->
+<div class="view" id="view-form">
+  <div class="content">
+
+    <div class="form-topbar no-print">
+      <button class="back-btn" onclick="showView('home')">← <span id="t-back-home">Back</span></button>
+      <span class="form-title" id="form-title-text">New Delivery Document</span>
+    </div>
+
+    <div class="english-note no-print" id="t-english-note">
+      📌 Fill in field content in English — technical documentation is easier to search and share in one language.
+    </div>
+
+    <!-- Autofill banner (hidden by default) -->
+    <div class="autofill-banner" id="autofill-banner" style="display:none">
+      <div class="autofill-banner-text" id="autofill-text"></div>
+      <div class="autofill-banner-actions">
+        <button class="btn btn-teal" style="padding:5px 12px;font-size:12px" id="autofill-yes-btn">Yes, use these</button>
+        <button class="autofill-dismiss" onclick="document.getElementById('autofill-banner').style.display='none'">✕</button>
+      </div>
+    </div>
+
+    <!-- Project info -->
+    <div class="section-card">
+      <div class="section-head" id="sh-project">Project Information</div>
+      <div class="section-body grid-2">
+        <div class="field">
+          <label id="lbl-project-name">Project name</label>
+          <input type="text" id="projectName" placeholder="e.g. NIO upgrade – Customer AB" oninput="updateFormTitle()">
+        </div>
+        <div class="field">
+          <label id="lbl-project-number">Project number</label>
+          <input type="text" id="projectNumber" placeholder="e.g. 2024-0045">
+        </div>
+        <div class="field" id="customer-field-wrap">
+          <label id="lbl-customer">Customer</label>
+          <input type="text" id="customer" placeholder="Customer name"
+            oninput="handleCustomerInput(this.value)" autocomplete="off">
+          <div class="ac-dropdown" id="customer-ac" style="display:none"></div>
+        </div>
+        <div class="field">
+          <label id="lbl-date">Date</label>
+          <input type="date" id="date">
+        </div>
+        <div class="field" id="consultant-field-wrap">
+          <label id="lbl-consultant">Consultant</label>
+          <input type="text" id="consultant" placeholder="Full name"
+            oninput="handleConsultantInput(this.value)" autocomplete="off">
+          <div class="ac-dropdown" id="consultant-ac" style="display:none"></div>
+        </div>
+        <div class="field">
+          <label id="lbl-email">Email</label>
+          <input type="email" id="consultantEmail" placeholder="name@company.com">
+        </div>
+        <div class="field">
+          <label id="lbl-phone">Phone</label>
+          <input type="text" id="consultantPhone" placeholder="+xx xx xx xx xx">
+        </div>
+      </div>
+    </div>
+
+    <!-- Delivery description -->
+    <div class="section-card">
+      <div class="section-head" id="sh-delivery">Delivery Description</div>
+      <div class="section-body">
+        <div class="field">
+          <label id="lbl-scope">Scope – what was delivered?</label>
+          <textarea id="deliveryDescription" rows="4"
+            placeholder="Describe the delivery – what was configured, installed, migrated or set up..."></textarea>
+          <div class="hint" id="hint-scope">Give the customer a clear understanding of what was done.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical configuration -->
+    <div class="section-card">
+      <div class="section-head" id="sh-tech">Technical Configuration</div>
+      <div class="section-body">
+        <div class="grid-2">
+          <div class="field">
+            <label id="lbl-server">Server name</label>
+            <input type="text" id="serverName" placeholder="srv-prod-01.customer.com">
+          </div>
+          <div class="field">
+            <label id="lbl-paths">Path / program files</label>
+            <input type="text" id="programPaths" placeholder="C:\Program Files\App\">
+          </div>
+        </div>
+        <div class="field">
+          <label id="lbl-startup">How to start the application/module</label>
+          <textarea id="startupInstructions" rows="2"
+            placeholder="e.g. Services.msc → 'AppService' → Start"></textarea>
+          <div class="hint" id="hint-startup">How is the service started or restarted?</div>
+        </div>
+        <div class="field">
+          <label id="lbl-config-cred">Config files – username/password</label>
+          <textarea id="configCredentials" rows="2" placeholder="Filename and path..."></textarea>
+        </div>
+        <div class="field">
+          <label id="lbl-config-conn">Config files – connection strings</label>
+          <textarea id="configConnectionStrings" rows="2" placeholder="Filename and path..."></textarea>
+        </div>
+        <div class="field">
+          <label id="lbl-scheduled">Scheduled tasks</label>
+          <textarea id="scheduledTasks" rows="2" placeholder="Task name, interval, what it does..."></textarea>
+        </div>
+        <div class="field">
+          <label id="lbl-credentials">Credentials used</label>
+          <textarea id="credentialsUsed" rows="2"
+            placeholder="Service accounts, API keys, certificates..."></textarea>
+          <div class="hint" id="hint-credentials">Service accounts, API keys, certificates, etc.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data flow + URLs -->
+    <div class="section-card">
+      <div class="section-head" id="sh-dataflow">Data Flow and URLs</div>
+      <div class="section-body">
+        <div class="field">
+          <label id="lbl-dataflow">Data flow overview</label>
+          <textarea id="dataFlow" rows="3"
+            placeholder="e.g. SCADA → AppAPI (REST) → Database (DB) → Report module..."></textarea>
+        </div>
+        <div class="field">
+          <label id="lbl-urls">URLs</label>
+          <div id="url-list"></div>
+          <button class="btn-add" onclick="addUrl()" id="btn-add-url">+ Add URL</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom fields -->
+    <div class="section-card">
+      <div class="section-head" id="sh-custom">Additional Information (optional)</div>
+      <div class="section-body">
+        <p class="hint" style="margin-bottom:12px" id="hint-custom">
+          Add any fields specific to this delivery — license keys, backup procedures, special integrations, etc.
+        </p>
+        <div id="cf-list"></div>
+        <button class="btn-add" onclick="addCustomField()" id="btn-add-field">+ Add field</button>
+      </div>
+    </div>
+
+    <!-- Company contact -->
+    <div class="section-card">
+      <div class="section-head" id="sh-contact">Contact Information</div>
+      <div class="section-body grid-2">
+        <div class="field">
+          <label id="lbl-contact-name">Consultant name (for document)</label>
+          <input type="text" id="volueConsultantName" placeholder="Full name">
+        </div>
+        <div class="field">
+          <label id="lbl-contact-email">Consultant email</label>
+          <input type="email" id="volueConsultantEmail" placeholder="name@company.com">
+        </div>
+        <div class="field">
+          <label id="lbl-contact-phone">Consultant phone</label>
+          <input type="text" id="volueConsultantPhone" placeholder="+xx xx xx xx xx">
+        </div>
+        <div></div>
+        <div class="field">
+          <label id="lbl-support-email">Support email</label>
+          <input type="text" id="supportEmail">
+        </div>
+        <div class="field">
+          <label id="lbl-support-phone">Support phone</label>
+          <input type="text" id="supportPhone">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-footer no-print">
+      <button class="btn-outline" onclick="showView('home')">← <span id="t-cancel">Cancel</span></button>
+      <button class="btn btn-teal" onclick="saveDoc()" id="btn-save-doc" style="padding:8px 18px;font-size:13px">💾 <span id="t-save-doc">Save document</span></button>
+      <button class="btn-navy" onclick="showView('preview')" id="btn-preview-btn">👁 <span id="t-preview">Preview →</span></button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════ PREVIEW VIEW ════════════ -->
+<div class="view" id="view-preview">
+  <div class="content">
+    <div class="preview-topbar no-print">
+      <button class="btn-outline" onclick="showView('form')">← <span id="t-back-form">Back to form</span></button>
+      <button class="btn-navy" onclick="window.print()">🖨️ <span id="t-print-pdf">Print / Save as PDF</span></button>
+    </div>
+    <div class="preview-doc" id="preview-area"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG — Edit this section for your instance
+//  Never commit real Supabase credentials to a public repository
+// ═══════════════════════════════════════════════════════════════
+const APP_CONFIG = {
+  companyName:    'My Company',          // Shown in document footer + topbar
+  companyWebsite: 'mycompany.com',
+  supportEmail:   'support@mycompany.com',
+  supportPhone:   '',
+  supabaseUrl:    'https://qznlbzmarhqjdxfykuca.supabase.co',
+  supabaseKey:    'sb_publishable_LRXKNcS-8lPrMGHmLD72MA_jabdxNs0',
+  supabaseTable:  'delivery_docs',
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  TRANSLATIONS
+// ═══════════════════════════════════════════════════════════════
+const T = {
+  en:{
+    disclaimer:"Do not enter confidential data, passwords, or real customer data. For testing purposes only.",
+    app_title:"Delivery Docs", home_title:"Delivery Documentation",
+    home_desc:"Create technical handover documentation for every delivery. Searchable, structured, shareable.",
+    t_new_doc:"New Document", t_stat_docs:"Documents", t_stat_customers:"Customers",
+    t_search_title:"Find Documentation",
+    t_search_hint:"Fuzzy search across project name, number, customer, consultant, server name and URLs.",
+    t_search_ph:"Search project, customer, consultant, server, URL...",
+    t_recent:"Recent Documents", t_loading:"Loading...",
+    t_back_home:"Back", t_cancel:"Cancel",
+    t_save:"Save", t_save_doc:"Save document",
+    t_preview:"Preview →", t_print:"Print", t_print_pdf:"Print / Save as PDF",
+    t_back_form:"Back to form", t_english_note:"📌 Fill in field content in English — easier to search and share.",
+    sh_project:"Project Information", sh_delivery:"Delivery Description",
+    sh_tech:"Technical Configuration", sh_dataflow:"Data Flow and URLs",
+    sh_custom:"Additional Information (optional)", sh_contact:"Contact Information",
+    lbl_project_name:"Project name", lbl_project_number:"Project number",
+    lbl_customer:"Customer", lbl_date:"Date", lbl_consultant:"Consultant",
+    lbl_email:"Email", lbl_phone:"Phone",
+    lbl_scope:"Scope – what was delivered?", hint_scope:"Give the customer a clear understanding of what was done.",
+    lbl_server:"Server name", lbl_paths:"Path / program files",
+    lbl_startup:"How to start the application/module", hint_startup:"How is the service started or restarted?",
+    lbl_config_cred:"Config files – username/password", lbl_config_conn:"Config files – connection strings",
+    lbl_scheduled:"Scheduled tasks", lbl_credentials:"Credentials used",
+    hint_credentials:"Service accounts, API keys, certificates, etc.",
+    lbl_dataflow:"Data flow overview", lbl_urls:"URLs",
+    hint_custom:"Add fields specific to this delivery — license keys, backup procedures, etc.",
+    btn_add_url:"+ Add URL", btn_add_field:"+ Add field",
+    lbl_contact_name:"Consultant name (for document)", lbl_contact_email:"Consultant email",
+    lbl_contact_phone:"Consultant phone", lbl_support_email:"Support email", lbl_support_phone:"Support phone",
+    doc_title:"Delivery Documentation",
+    prev_project:"Project Information", prev_delivery:"Delivery Description",
+    prev_tech:"Technical Configuration", prev_dataflow:"Data Flow",
+    prev_urls:"URLs", prev_custom:"Additional Information", prev_contact:"Contact Information",
+    row_project:"Project name", row_proj_num:"Project no.", row_customer:"Customer",
+    row_date:"Date", row_consultant:"Consultant",
+    row_server:"Server name", row_paths:"Path / program files", row_startup:"Startup",
+    row_config_cred:"Config – username/pwd", row_config_conn:"Config – connection strings",
+    row_scheduled:"Scheduled tasks", row_credentials:"Credentials used",
+    row_contact:"Responsible consultant", row_support:"Support",
+    ac_existing_customer:"Existing customer found", ac_existing_consultant:"Consultant found in system",
+    ac_use_consultant:"Use contact details?",
+    no_results:"No matching documents found.", form_new:"New Delivery Document",
+    form_edit:"Edit Document", no_supabase:"Local storage", supabase_ok:"Connected",
+    delete_confirm:"Delete this document?",
+  },
+  no:{
+    disclaimer:"Ikke legg inn konfidensielle data, passord eller reelle kundedata. Kun for testing.",
+    app_title:"Leveransedok.", home_title:"Leveransedokumentasjon",
+    home_desc:"Lag teknisk overleveringsdokumentasjon for alle leveranser. Søkbar, strukturert og delbar.",
+    t_new_doc:"Nytt dokument", t_stat_docs:"Dokumenter", t_stat_customers:"Kunder",
+    t_search_title:"Finn dokumentasjon",
+    t_search_hint:"Fuzzy-søk på prosjektnavn, nummer, kunde, konsulent, servernavn og URL-er.",
+    t_search_ph:"Søk prosjekt, kunde, konsulent, server, URL...",
+    t_recent:"Siste dokumenter", t_loading:"Laster...",
+    t_back_home:"Tilbake", t_cancel:"Avbryt",
+    t_save:"Lagre", t_save_doc:"Lagre dokument",
+    t_preview:"Forhåndsvis →", t_print:"Skriv ut", t_print_pdf:"Skriv ut / Lagre som PDF",
+    t_back_form:"Tilbake til skjema", t_english_note:"📌 Fyll inn feltinnhold på engelsk — enklere å søke og dele.",
+    sh_project:"Prosjektinformasjon", sh_delivery:"Leveransebeskrivelse",
+    sh_tech:"Teknisk konfigurasjon", sh_dataflow:"Dataflyt og URL-er",
+    sh_custom:"Tilleggsinformasjon (valgfritt)", sh_contact:"Kontaktinformasjon",
+    lbl_project_name:"Prosjektnavn", lbl_project_number:"Prosjektnummer",
+    lbl_customer:"Kunde", lbl_date:"Dato", lbl_consultant:"Konsulent",
+    lbl_email:"E-post", lbl_phone:"Telefon",
+    lbl_scope:"Scope – hva er levert?", hint_scope:"Gi kunden en klar forståelse av hva som ble gjort.",
+    lbl_server:"Servernavn", lbl_paths:"Path / programfiler",
+    lbl_startup:"Oppstart av applikasjon/modul", hint_startup:"Hvordan startes tjenesten?",
+    lbl_config_cred:"Konfig-filer – brukernavn/passord", lbl_config_conn:"Konfig-filer – connection strings",
+    lbl_scheduled:"Scheduled tasks", lbl_credentials:"Credentials brukt",
+    hint_credentials:"Tjenestekontoer, API-nøkler, sertifikater e.l.",
+    lbl_dataflow:"Skisse over dataflyt", lbl_urls:"URL-er",
+    hint_custom:"Legg til felt spesifikke for denne leveransen.",
+    btn_add_url:"+ Legg til URL", btn_add_field:"+ Legg til felt",
+    lbl_contact_name:"Konsulentens navn (for dokument)", lbl_contact_email:"Konsulentens e-post",
+    lbl_contact_phone:"Konsulentens telefon", lbl_support_email:"Support-epost", lbl_support_phone:"Support-telefon",
+    doc_title:"Leveransedokumentasjon",
+    prev_project:"Prosjektinformasjon", prev_delivery:"Leveransebeskrivelse",
+    prev_tech:"Teknisk konfigurasjon", prev_dataflow:"Dataflyt",
+    prev_urls:"URL-er", prev_custom:"Tilleggsinformasjon", prev_contact:"Kontaktinformasjon",
+    row_project:"Prosjektnavn", row_proj_num:"Prosjektnr.", row_customer:"Kunde",
+    row_date:"Dato", row_consultant:"Konsulent",
+    row_server:"Servernavn", row_paths:"Path / programfiler", row_startup:"Oppstart",
+    row_config_cred:"Konfig – brukernavn/passord", row_config_conn:"Konfig – connection strings",
+    row_scheduled:"Scheduled tasks", row_credentials:"Credentials brukt",
+    row_contact:"Ansvarlig konsulent", row_support:"Support",
+    ac_existing_customer:"Eksisterende kunde funnet", ac_existing_consultant:"Konsulent funnet i systemet",
+    ac_use_consultant:"Bruk kontaktinfo?",
+    no_results:"Ingen treff.", form_new:"Nytt leveransedokument", form_edit:"Rediger dokument",
+    no_supabase:"Lokal lagring", supabase_ok:"Tilkoblet",
+    delete_confirm:"Slett dette dokumentet?",
+  },
+  sv:{
+    disclaimer:"Ange inte konfidentiell information, lösenord eller verklig kunddata. Endast för testning.",
+    app_title:"Leveransdok.", home_title:"Leveransdokumentation",
+    home_desc:"Skapa teknisk överlämningsdokumentation för varje leverans.",
+    t_new_doc:"Nytt dokument", t_stat_docs:"Dokument", t_stat_customers:"Kunder",
+    t_search_title:"Hitta dokumentation",
+    t_search_hint:"Fuzzy-sökning på projektnamn, nummer, kund, konsult, servernamn och URL:er.",
+    t_search_ph:"Sök projekt, kund, konsult, server, URL...",
+    t_recent:"Senaste dokument", t_loading:"Laddar...",
+    t_back_home:"Tillbaka", t_cancel:"Avbryt",
+    t_save:"Spara", t_save_doc:"Spara dokument",
+    t_preview:"Förhandsgranskning →", t_print:"Skriv ut", t_print_pdf:"Skriv ut / Spara som PDF",
+    t_back_form:"Tillbaka till formuläret", t_english_note:"📌 Fyll i fältinnehåll på engelska.",
+    sh_project:"Projektinformation", sh_delivery:"Leveransbeskrivning",
+    sh_tech:"Teknisk konfiguration", sh_dataflow:"Dataflöde och URL:er",
+    sh_custom:"Tilläggsinformation (valfritt)", sh_contact:"Kontaktinformation",
+    lbl_project_name:"Projektnamn", lbl_project_number:"Projektnummer",
+    lbl_customer:"Kund", lbl_date:"Datum", lbl_consultant:"Konsult",
+    lbl_email:"E-post", lbl_phone:"Telefon",
+    lbl_scope:"Scope – vad har levererats?", hint_scope:"Ge kunden en tydlig förståelse.",
+    lbl_server:"Servernamn", lbl_paths:"Path / programfiler",
+    lbl_startup:"Start av applikation/modul", hint_startup:"Hur startas tjänsten?",
+    lbl_config_cred:"Konfig – användarnamn/lösenord", lbl_config_conn:"Konfig – connection strings",
+    lbl_scheduled:"Schemalagda uppgifter", lbl_credentials:"Använda autentiseringsuppgifter",
+    hint_credentials:"Tjänstekonton, API-nycklar, certifikat o.s.v.",
+    lbl_dataflow:"Dataflödesöversikt", lbl_urls:"URL:er",
+    hint_custom:"Lägg till fält specifika för denna leverans.",
+    btn_add_url:"+ Lägg till URL", btn_add_field:"+ Lägg till fält",
+    lbl_contact_name:"Konsultens namn", lbl_contact_email:"Konsultens e-post",
+    lbl_contact_phone:"Konsultens telefon", lbl_support_email:"Support e-post", lbl_support_phone:"Support telefon",
+    doc_title:"Leveransdokumentation",
+    prev_project:"Projektinformation", prev_delivery:"Leveransbeskrivning",
+    prev_tech:"Teknisk konfiguration", prev_dataflow:"Dataflöde",
+    prev_urls:"URL:er", prev_custom:"Tilläggsinformation", prev_contact:"Kontaktinformation",
+    row_project:"Projektnamn", row_proj_num:"Projektnr.", row_customer:"Kund",
+    row_date:"Datum", row_consultant:"Konsult",
+    row_server:"Servernamn", row_paths:"Path / programfiler", row_startup:"Start",
+    row_config_cred:"Konfig – användarnamn", row_config_conn:"Konfig – connection strings",
+    row_scheduled:"Schemalagda uppgifter", row_credentials:"Autentiseringsuppgifter",
+    row_contact:"Ansvarig konsult", row_support:"Support",
+    ac_existing_customer:"Befintlig kund hittad", ac_existing_consultant:"Konsult hittad i systemet",
+    ac_use_consultant:"Använd kontaktuppgifter?",
+    no_results:"Inga matchande dokument.", form_new:"Nytt leveransdokument", form_edit:"Redigera dokument",
+    no_supabase:"Lokal lagring", supabase_ok:"Ansluten", delete_confirm:"Ta bort detta dokument?",
+  },
+  da:{
+    disclaimer:"Indtast ikke fortrolige data, adgangskoder eller reelle kundedata. Kun til test.",
+    app_title:"Leverancedok.", home_title:"Leverancedokumentation",
+    home_desc:"Opret teknisk overleveringsdokumentation for alle leverancer.",
+    t_new_doc:"Nyt dokument", t_stat_docs:"Dokumenter", t_stat_customers:"Kunder",
+    t_search_title:"Find dokumentation",
+    t_search_hint:"Fuzzy-søgning på projektnavn, nummer, kunde, konsulent, servernavn og URL-er.",
+    t_search_ph:"Søg projekt, kunde, konsulent, server, URL...",
+    t_recent:"Seneste dokumenter", t_loading:"Indlæser...",
+    t_back_home:"Tilbage", t_cancel:"Annuller",
+    t_save:"Gem", t_save_doc:"Gem dokument",
+    t_preview:"Forhåndsvisning →", t_print:"Udskriv", t_print_pdf:"Udskriv / Gem som PDF",
+    t_back_form:"Tilbage til skema", t_english_note:"📌 Udfyld feltindhold på engelsk.",
+    sh_project:"Projektinformation", sh_delivery:"Leverancebeskrivelse",
+    sh_tech:"Teknisk konfiguration", sh_dataflow:"Dataflow og URL-er",
+    sh_custom:"Yderligere information (valgfrit)", sh_contact:"Kontaktinformation",
+    lbl_project_name:"Projektnavn", lbl_project_number:"Projektnummer",
+    lbl_customer:"Kunde", lbl_date:"Dato", lbl_consultant:"Konsulent",
+    lbl_email:"E-mail", lbl_phone:"Telefon",
+    lbl_scope:"Scope – hvad er leveret?", hint_scope:"Giv kunden en klar forståelse.",
+    lbl_server:"Servernavn", lbl_paths:"Path / programfiler",
+    lbl_startup:"Start af applikation/modul", hint_startup:"Hvordan startes tjenesten?",
+    lbl_config_cred:"Konfig – brugernavn/adgangskode", lbl_config_conn:"Konfig – connection strings",
+    lbl_scheduled:"Planlagte opgaver", lbl_credentials:"Credentials brugt",
+    hint_credentials:"Tjenestekonti, API-nøgler, certifikater o.l.",
+    lbl_dataflow:"Skitse over dataflow", lbl_urls:"URL-er",
+    hint_custom:"Tilføj felter specifikke for denne leverance.",
+    btn_add_url:"+ Tilføj URL", btn_add_field:"+ Tilføj felt",
+    lbl_contact_name:"Konsulentens navn", lbl_contact_email:"Konsulentens e-mail",
+    lbl_contact_phone:"Konsulentens telefon", lbl_support_email:"Support-email", lbl_support_phone:"Support-telefon",
+    doc_title:"Leverancedokumentation",
+    prev_project:"Projektinformation", prev_delivery:"Leverancebeskrivelse",
+    prev_tech:"Teknisk konfiguration", prev_dataflow:"Dataflow",
+    prev_urls:"URL-er", prev_custom:"Yderligere information", prev_contact:"Kontaktinformation",
+    row_project:"Projektnavn", row_proj_num:"Projektnr.", row_customer:"Kunde",
+    row_date:"Dato", row_consultant:"Konsulent",
+    row_server:"Servernavn", row_paths:"Path / programfiler", row_startup:"Start",
+    row_config_cred:"Konfig – brugernavn", row_config_conn:"Konfig – connection strings",
+    row_scheduled:"Planlagte opgaver", row_credentials:"Credentials brugt",
+    row_contact:"Ansvarlig konsulent", row_support:"Support",
+    ac_existing_customer:"Eksisterende kunde fundet", ac_existing_consultant:"Konsulent fundet i systemet",
+    ac_use_consultant:"Brug kontaktoplysninger?",
+    no_results:"Ingen resultater.", form_new:"Nyt leverancedokument", form_edit:"Rediger dokument",
+    no_supabase:"Lokal lagring", supabase_ok:"Forbundet", delete_confirm:"Slet dette dokument?",
+  },
+  de:{
+    disclaimer:"Bitte keine vertraulichen Daten, Passwörter oder echte Kundendaten eingeben. Nur für Testzwecke.",
+    app_title:"Lieferdok.", home_title:"Lieferdokumentation",
+    home_desc:"Erstellen Sie technische Übergabedokumentation für jede Lieferung.",
+    t_new_doc:"Neues Dokument", t_stat_docs:"Dokumente", t_stat_customers:"Kunden",
+    t_search_title:"Dokumentation finden",
+    t_search_hint:"Fuzzy-Suche in Projektname, -nummer, Kunde, Berater, Servername und URLs.",
+    t_search_ph:"Suche Projekt, Kunde, Berater, Server, URL...",
+    t_recent:"Zuletzt verwendet", t_loading:"Laden...",
+    t_back_home:"Zurück", t_cancel:"Abbrechen",
+    t_save:"Speichern", t_save_doc:"Dokument speichern",
+    t_preview:"Vorschau →", t_print:"Drucken", t_print_pdf:"Drucken / Als PDF speichern",
+    t_back_form:"Zurück zum Formular", t_english_note:"📌 Feldinhalte bitte auf Englisch ausfüllen.",
+    sh_project:"Projektinformationen", sh_delivery:"Lieferbeschreibung",
+    sh_tech:"Technische Konfiguration", sh_dataflow:"Datenfluss und URLs",
+    sh_custom:"Zusatzinformationen (optional)", sh_contact:"Kontaktinformation",
+    lbl_project_name:"Projektname", lbl_project_number:"Projektnummer",
+    lbl_customer:"Kunde", lbl_date:"Datum", lbl_consultant:"Berater",
+    lbl_email:"E-Mail", lbl_phone:"Telefon",
+    lbl_scope:"Scope – was wurde geliefert?", hint_scope:"Geben Sie dem Kunden ein klares Bild.",
+    lbl_server:"Servername", lbl_paths:"Pfad / Programmdateien",
+    lbl_startup:"Start der Anwendung/des Moduls", hint_startup:"Wie wird der Dienst gestartet?",
+    lbl_config_cred:"Konfigdateien – Benutzername/Passwort", lbl_config_conn:"Konfigdateien – Connection Strings",
+    lbl_scheduled:"Geplante Aufgaben", lbl_credentials:"Verwendete Anmeldedaten",
+    hint_credentials:"Dienstkonten, API-Schlüssel, Zertifikate usw.",
+    lbl_dataflow:"Datenflussübersicht", lbl_urls:"URLs",
+    hint_custom:"Fügen Sie für diese Lieferung spezifische Felder hinzu.",
+    btn_add_url:"+ URL hinzufügen", btn_add_field:"+ Feld hinzufügen",
+    lbl_contact_name:"Name des Beraters", lbl_contact_email:"E-Mail des Beraters",
+    lbl_contact_phone:"Telefon des Beraters", lbl_support_email:"Support-E-Mail", lbl_support_phone:"Support-Telefon",
+    doc_title:"Lieferdokumentation",
+    prev_project:"Projektinformationen", prev_delivery:"Lieferbeschreibung",
+    prev_tech:"Technische Konfiguration", prev_dataflow:"Datenfluss",
+    prev_urls:"URLs", prev_custom:"Zusatzinformationen", prev_contact:"Kontaktinformation",
+    row_project:"Projektname", row_proj_num:"Projektnr.", row_customer:"Kunde",
+    row_date:"Datum", row_consultant:"Berater",
+    row_server:"Servername", row_paths:"Pfad / Programmdateien", row_startup:"Start",
+    row_config_cred:"Konfig – Benutzername", row_config_conn:"Konfig – Connection Strings",
+    row_scheduled:"Geplante Aufgaben", row_credentials:"Anmeldedaten",
+    row_contact:"Verantwortlicher Berater", row_support:"Support",
+    ac_existing_customer:"Bestehenden Kunden gefunden", ac_existing_consultant:"Berater im System gefunden",
+    ac_use_consultant:"Kontaktdaten verwenden?",
+    no_results:"Keine Ergebnisse.", form_new:"Neues Lieferdokument", form_edit:"Dokument bearbeiten",
+    no_supabase:"Lokaler Speicher", supabase_ok:"Verbunden", delete_confirm:"Dieses Dokument löschen?",
+  },
+  pl:{
+    disclaimer:"Nie wprowadzaj poufnych danych, haseł ani rzeczywistych danych klientów. Tylko do celów testowych.",
+    app_title:"Dok. dostawy", home_title:"Dokumentacja Dostawy",
+    home_desc:"Twórz techniczną dokumentację przekazania dla każdej dostawy.",
+    t_new_doc:"Nowy dokument", t_stat_docs:"Dokumenty", t_stat_customers:"Klienci",
+    t_search_title:"Znajdź dokumentację",
+    t_search_hint:"Wyszukiwanie rozmyte po nazwie projektu, numerze, kliencie, konsultancie, serwerze i URL-ach.",
+    t_search_ph:"Szukaj projektu, klienta, konsultanta, serwera, URL...",
+    t_recent:"Ostatnie dokumenty", t_loading:"Ładowanie...",
+    t_back_home:"Powrót", t_cancel:"Anuluj",
+    t_save:"Zapisz", t_save_doc:"Zapisz dokument",
+    t_preview:"Podgląd →", t_print:"Drukuj", t_print_pdf:"Drukuj / Zapisz jako PDF",
+    t_back_form:"Powrót do formularza", t_english_note:"📌 Wypełniaj pola po angielsku.",
+    sh_project:"Informacje o projekcie", sh_delivery:"Opis dostawy",
+    sh_tech:"Konfiguracja techniczna", sh_dataflow:"Przepływ danych i URL-e",
+    sh_custom:"Informacje dodatkowe (opcjonalnie)", sh_contact:"Dane kontaktowe",
+    lbl_project_name:"Nazwa projektu", lbl_project_number:"Numer projektu",
+    lbl_customer:"Klient", lbl_date:"Data", lbl_consultant:"Konsultant",
+    lbl_email:"E-mail", lbl_phone:"Telefon",
+    lbl_scope:"Zakres – co zostało dostarczone?", hint_scope:"Daj klientowi jasne zrozumienie.",
+    lbl_server:"Nazwa serwera", lbl_paths:"Ścieżka / pliki programu",
+    lbl_startup:"Uruchomienie aplikacji/modułu", hint_startup:"Jak uruchomić usługę?",
+    lbl_config_cred:"Pliki konfiguracyjne – login/hasło", lbl_config_conn:"Pliki konfiguracyjne – connection strings",
+    lbl_scheduled:"Zaplanowane zadania", lbl_credentials:"Użyte dane uwierzytelniające",
+    hint_credentials:"Konta usług, klucze API, certyfikaty itp.",
+    lbl_dataflow:"Schemat przepływu danych", lbl_urls:"URL-e",
+    hint_custom:"Dodaj pola specyficzne dla tej dostawy.",
+    btn_add_url:"+ Dodaj URL", btn_add_field:"+ Dodaj pole",
+    lbl_contact_name:"Imię i nazwisko konsultanta", lbl_contact_email:"E-mail konsultanta",
+    lbl_contact_phone:"Telefon konsultanta", lbl_support_email:"E-mail wsparcia", lbl_support_phone:"Telefon wsparcia",
+    doc_title:"Dokumentacja Dostawy",
+    prev_project:"Informacje o projekcie", prev_delivery:"Opis dostawy",
+    prev_tech:"Konfiguracja techniczna", prev_dataflow:"Przepływ danych",
+    prev_urls:"URL-e", prev_custom:"Informacje dodatkowe", prev_contact:"Dane kontaktowe",
+    row_project:"Nazwa projektu", row_proj_num:"Nr projektu", row_customer:"Klient",
+    row_date:"Data", row_consultant:"Konsultant",
+    row_server:"Nazwa serwera", row_paths:"Ścieżka / pliki", row_startup:"Uruchomienie",
+    row_config_cred:"Konfig – login/hasło", row_config_conn:"Konfig – connection strings",
+    row_scheduled:"Zaplanowane zadania", row_credentials:"Dane uwierzytelniające",
+    row_contact:"Odpowiedzialny konsultant", row_support:"Wsparcie",
+    ac_existing_customer:"Znaleziono istniejącego klienta", ac_existing_consultant:"Konsultant znaleziony w systemie",
+    ac_use_consultant:"Użyć danych kontaktowych?",
+    no_results:"Brak wyników.", form_new:"Nowy dokument dostawy", form_edit:"Edytuj dokument",
+    no_supabase:"Lokalne przechowywanie", supabase_ok:"Połączono", delete_confirm:"Usunąć ten dokument?",
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  APP STATE
+// ═══════════════════════════════════════════════════════════════
+let lang      = localStorage.getItem('dlv_lang') || 'en';
+let sb        = null;
+let allDocs   = [];
+let fuseIdx   = null;
+let currentId = null;
+let urlCount  = 0;
+let cfCount   = 0;
+let acDebounce= null;
+
+const tr = k => (T[lang]&&T[lang][k]) || (T.en&&T.en[k]) || k;
+
+// ═══════════════════════════════════════════════════════════════
+//  SUPABASE
+// ═══════════════════════════════════════════════════════════════
+function initSupabase() {
+  if (!APP_CONFIG.supabaseUrl || APP_CONFIG.supabaseUrl === 'YOUR_SUPABASE_URL') {
+    console.warn('Supabase not configured — using localStorage');
+    return;
+  }
+  try {
+    sb = supabase.createClient(APP_CONFIG.supabaseUrl, APP_CONFIG.supabaseKey);
+    // Test connection with a lightweight query
+    sb.from(APP_CONFIG.supabaseTable).select('id', { count:'exact', head:true })
+      .then(({ error }) => {
+        if (error) {
+          console.error('Supabase connection test failed:', error.message);
+          document.getElementById('conn-dot').classList.add('err');
+          document.getElementById('conn-dot').title = 'Connection error: ' + error.message;
+          sb = null;
+        } else {
+          document.getElementById('conn-dot').classList.add('ok');
+          document.getElementById('conn-dot').title = tr('supabase_ok');
+        }
+      });
+  } catch(e) {
+    console.error('Supabase init error:', e);
+    document.getElementById('conn-dot').classList.add('err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LANGUAGE
+// ═══════════════════════════════════════════════════════════════
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('dlv_lang', l);
+  document.querySelectorAll('.lang-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === l));
+  applyTranslations();
+}
+
+function applyTranslations() {
+  const se = (id,k) => { const e=document.getElementById(id); if(e) e.textContent=tr(k); };
+  const sp = (id,k) => { const e=document.getElementById(id); if(e) e.placeholder=tr(k); };
+  document.getElementById('topbar-appname').textContent = tr('app_title');
+  document.getElementById('brand-name').textContent     = APP_CONFIG.companyName;
+  document.getElementById('home-title').textContent     = tr('home_title');
+  document.getElementById('home-desc').textContent      = tr('home_desc');
+  se('t-new-doc','t_new_doc');      se('t-stat-docs','t_stat_docs');
+  se('t-stat-customers','t_stat_customers');
+  se('t-search-title','t_search_title'); se('t-search-hint','t_search_hint');
+  se('t-recent','t_recent');        se('t-loading','t_loading');
+  se('t-back-home','t_back_home');  se('t-cancel','t_cancel');
+  se('t-save','t_save');            se('t-save-doc','t_save_doc');
+  se('t-preview','t_preview');      se('t-print','t_print');
+  se('t-print-pdf','t_print_pdf');  se('t-back-form','t_back_form');
+  se('t-english-note','t_english_note');
+  sp('search-input','t_search_ph');
+  se('sh-project','sh_project');    se('sh-delivery','sh_delivery');
+  se('sh-tech','sh_tech');          se('sh-dataflow','sh_dataflow');
+  se('sh-custom','sh_custom');      se('sh-contact','sh_contact');
+  se('lbl-project-name','lbl_project_name'); se('lbl-project-number','lbl_project_number');
+  se('lbl-customer','lbl_customer'); se('lbl-date','lbl_date');
+  se('lbl-consultant','lbl_consultant'); se('lbl-email','lbl_email'); se('lbl-phone','lbl_phone');
+  se('lbl-scope','lbl_scope');      se('hint-scope','hint_scope');
+  se('lbl-server','lbl_server');    se('lbl-paths','lbl_paths');
+  se('lbl-startup','lbl_startup');  se('hint-startup','hint_startup');
+  se('lbl-config-cred','lbl_config_cred'); se('lbl-config-conn','lbl_config_conn');
+  se('lbl-scheduled','lbl_scheduled'); se('lbl-credentials','lbl_credentials');
+  se('hint-credentials','hint_credentials');
+  se('lbl-dataflow','lbl_dataflow'); se('lbl-urls','lbl_urls');
+  se('hint-custom','hint_custom');
+  se('btn-add-url','btn_add_url');  se('btn-add-field','btn_add_field');
+  se('lbl-contact-name','lbl_contact_name'); se('lbl-contact-email','lbl_contact_email');
+  se('lbl-contact-phone','lbl_contact_phone'); se('lbl-support-email','lbl_support_email');
+  se('lbl-support-phone','lbl_support_phone');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DATA LOADING
+// ═══════════════════════════════════════════════════════════════
+async function loadAllDocs() {
+  let docs = [];
+  if (sb) {
+    try {
+      const { data, error } = await sb.from(APP_CONFIG.supabaseTable)
+        .select('*').order('saved_at', { ascending: false });
+      if (!error && data) docs = data;
+    } catch(e) { console.error('Load error:', e); }
+  }
+  // Merge localStorage
+  Object.keys(localStorage).filter(k=>k.startsWith('dlv_')).forEach(k=>{
+    try {
+      const r = JSON.parse(localStorage.getItem(k));
+      if (r && r.id && !docs.find(d=>d.id===r.id)) docs.push(r);
+    } catch {}
+  });
+  allDocs = docs;
+  buildSearchIndex();
+  updateStats();
+  renderRecent();
+}
+
+function buildSearchIndex() {
+  const items = allDocs.map(d => {
+    const data = d.data || d;
+    const urlsText = (data.urls||[]).map(u=>(u.label||'')+' '+(u.url||'')).join(' ');
+    return {
+      ...d,
+      _searchText: [
+        d.project_name||data.projectName, d.project_number||data.projectNumber,
+        d.customer||data.customer, d.consultant_name||data.consultant,
+        d.server_name||data.serverName, data.deliveryDescription,
+        data.dataFlow, data.programPaths, urlsText,
+      ].filter(Boolean).join(' ')
+    };
+  });
+  fuseIdx = new Fuse(items, {
+    keys: [
+      { name:'project_name', weight:3 },
+      { name:'project_number', weight:3 },
+      { name:'customer', weight:2.5 },
+      { name:'consultant_name', weight:2 },
+      { name:'server_name', weight:1.5 },
+      { name:'_searchText', weight:1 },
+    ],
+    threshold: 0.4,
+    includeScore: true,
+  });
+}
+
+function updateStats() {
+  document.getElementById('stat-total').textContent = allDocs.length;
+  const uniqueCustomers = new Set(allDocs.map(d=>d.customer||(d.data&&d.data.customer)).filter(Boolean));
+  document.getElementById('stat-customers').textContent = uniqueCustomers.size;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SEARCH
+// ═══════════════════════════════════════════════════════════════
+function handleSearch(q) {
+  const container = document.getElementById('search-results');
+  if (!q.trim()) { container.innerHTML=''; return; }
+  if (!fuseIdx) { container.innerHTML=`<div class="no-results">${tr('t_loading')}</div>`; return; }
+  const results = fuseIdx.search(q, { limit: 12 });
+  if (!results.length) {
+    container.innerHTML = `<div class="no-results">${tr('no_results')}</div>`;
+    return;
+  }
+  container.innerHTML = results.map(r => {
+    const d = r.item;
+    const data = d.data || d;
+    const name   = d.project_name || data.projectName || '(Untitled)';
+    const num    = d.project_number || data.projectNumber || '';
+    const cust   = d.customer || data.customer || '';
+    const cons   = d.consultant_name || data.consultant || '';
+    const srv    = d.server_name || data.serverName || '';
+    const dt     = d.doc_date || data.date || '';
+    const chips  = [num&&`#${num}`, cust, cons, srv, dt].filter(Boolean)
+      .map(c=>`<span class="sr-meta-chip">${esc(c)}</span>`).join('');
+    return `<div class="search-result-card" onclick="loadDoc('${d.id}')">
+      <div class="sr-left">
+        <div class="sr-name">${esc(name)}</div>
+        <div class="sr-meta">${chips}</div>
+      </div>
+      <div class="sr-actions">
+        <button class="btn btn-teal" style="padding:5px 10px;font-size:12px" onclick="event.stopPropagation();loadDoc('${d.id}')">Open →</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleSearch() {
+  const body    = document.getElementById('search-body');
+  const header  = document.getElementById('search-header');
+  const chevron = document.getElementById('search-chevron');
+  const open    = body.style.display !== 'none';
+  body.style.display    = open ? 'none' : 'block';
+  header.classList.toggle('open', !open);
+  chevron.classList.toggle('open', !open);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RECENT DOCS
+// ═══════════════════════════════════════════════════════════════
+function renderRecent() {
+  const el = document.getElementById('recent-docs');
+  const recent = allDocs.slice(0,6);
+  if (!recent.length) {
+    el.innerHTML=`<div class="empty-state">${tr('t_loading')}</div>`; return;
+  }
+  el.innerHTML = recent.map(d => {
+    const data = d.data||d;
+    const name = d.project_name||data.projectName||'(Untitled)';
+    const cust = d.customer||data.customer||'';
+    const dt   = d.doc_date||data.date||'';
+    const cons = d.consultant_name||data.consultant||'';
+    const meta = [cust,dt,cons].filter(Boolean).join(' · ');
+    return `<div class="recent-card" onclick="loadDoc('${d.id}')">
+      <div>
+        <div class="recent-name">${esc(name)}</div>
+        <div class="recent-meta">${esc(meta)}</div>
+      </div>
+      <span class="recent-arrow">›</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VIEW MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.getElementById('btn-save').style.display    = (name==='form')  ? 'inline-flex' : 'none';
+  document.getElementById('btn-print').style.display   = (name==='preview')? 'inline-flex' : 'none';
+  if (name==='preview') renderPreview();
+  if (name==='home')    { loadAllDocs(); closeAllAc(); }
+  hideAutofillBanner();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  AUTOCOMPLETE — Customer & Consultant
+// ═══════════════════════════════════════════════════════════════
+function getUniqueValues(field) {
+  const vals = allDocs.map(d => d[field] || (d.data&&d.data[field.replace('_name','')]) || '').filter(Boolean);
+  return [...new Set(vals)];
+}
+
+function showAcDropdown(acId, items, onSelect) {
+  const el = document.getElementById(acId);
+  if (!items.length) { el.style.display='none'; return; }
+  el.innerHTML = items.slice(0,6).map(item =>
+    `<div class="ac-item" onclick="(${onSelect.toString()})('${esc(item)}')">${esc(item)}</div>`
+  ).join('');
+  el.style.display = 'block';
+}
+
+function closeAllAc() {
+  document.getElementById('customer-ac').style.display='none';
+  document.getElementById('consultant-ac').style.display='none';
+}
+
+function handleCustomerInput(val) {
+  clearTimeout(acDebounce);
+  if (val.length < 2) { document.getElementById('customer-ac').style.display='none'; return; }
+  acDebounce = setTimeout(() => {
+    const customers = getUniqueValues('customer');
+    const fuse = new Fuse(customers.map(c=>({v:c})), {keys:['v'],threshold:0.4});
+    const matches = val.length < 3
+      ? customers.filter(c=>c.toLowerCase().startsWith(val.toLowerCase()))
+      : fuse.search(val).map(r=>r.item.v);
+    showAcDropdown('customer-ac', matches, (selected) => {
+      document.getElementById('customer').value = selected;
+      document.getElementById('customer-ac').style.display='none';
+      suggestFromCustomer(selected);
+    });
+  }, 200);
+}
+
+function handleConsultantInput(val) {
+  clearTimeout(acDebounce);
+  if (val.length < 2) { document.getElementById('consultant-ac').style.display='none'; return; }
+  acDebounce = setTimeout(() => {
+    const consultants = getUniqueValues('consultant_name');
+    const fuse = new Fuse(consultants.map(c=>({v:c})), {keys:['v'],threshold:0.4});
+    const matches = val.length < 3
+      ? consultants.filter(c=>c.toLowerCase().startsWith(val.toLowerCase()))
+      : fuse.search(val).map(r=>r.item.v);
+    showAcDropdown('consultant-ac', matches, (selected) => {
+      document.getElementById('consultant').value = selected;
+      document.getElementById('consultant-ac').style.display='none';
+      suggestFromConsultant(selected);
+    });
+  }, 200);
+}
+
+function suggestFromCustomer(customerName) {
+  const match = allDocs.find(d => (d.customer||(d.data&&d.data.customer)) === customerName);
+  if (!match) return;
+  const data = match.data||match;
+  const cons = match.consultant_name||data.consultant||'';
+  if (!cons) return;
+  showAutofillBanner(
+    `${tr('ac_existing_customer')}: <strong>${esc(customerName)}</strong>. ${tr('ac_use_consultant')}: <strong>${esc(cons)}</strong>`,
+    () => {
+      document.getElementById('consultant').value         = cons;
+      document.getElementById('consultantEmail').value    = data.consultantEmail||'';
+      document.getElementById('consultantPhone').value    = data.consultantPhone||'';
+      document.getElementById('volueConsultantName').value = cons;
+      document.getElementById('volueConsultantEmail').value= data.consultantEmail||'';
+      document.getElementById('volueConsultantPhone').value= data.consultantPhone||'';
+      hideAutofillBanner();
+    }
+  );
+}
+
+function suggestFromConsultant(consultantName) {
+  const match = allDocs.find(d =>
+    (d.consultant_name||(d.data&&d.data.consultant)) === consultantName);
+  if (!match) return;
+  const data = match.data||match;
+  const email = data.consultantEmail||'';
+  const phone = data.consultantPhone||'';
+  if (!email && !phone) return;
+  const detail = [email,phone].filter(Boolean).join(' / ');
+  showAutofillBanner(
+    `${tr('ac_existing_consultant')}: <strong>${esc(consultantName)}</strong> — ${esc(detail)}`,
+    () => {
+      document.getElementById('consultantEmail').value     = email;
+      document.getElementById('consultantPhone').value     = phone;
+      document.getElementById('volueConsultantName').value = consultantName;
+      document.getElementById('volueConsultantEmail').value= email;
+      document.getElementById('volueConsultantPhone').value= phone;
+      hideAutofillBanner();
+    }
+  );
+}
+
+function showAutofillBanner(htmlMsg, onYes) {
+  const banner = document.getElementById('autofill-banner');
+  document.getElementById('autofill-text').innerHTML = htmlMsg;
+  document.getElementById('autofill-yes-btn').onclick = onYes;
+  banner.style.display = 'flex';
+  banner.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function hideAutofillBanner() {
+  document.getElementById('autofill-banner').style.display='none';
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('#customer-field-wrap'))   document.getElementById('customer-ac').style.display='none';
+  if (!e.target.closest('#consultant-field-wrap'))  document.getElementById('consultant-ac').style.display='none';
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  FORM: DYNAMIC ROWS
+// ═══════════════════════════════════════════════════════════════
+function addUrl(label, url) {
+  const id = urlCount++;
+  const div = document.createElement('div');
+  div.className='url-row'; div.id='url-row-'+id;
+  div.innerHTML=`<input class="url-desc" type="text" placeholder="Description" value="${esc(label||'')}">
+    <input class="url-href" type="text" placeholder="https://..." value="${esc(url||'')}">
+    <button class="btn-remove" onclick="removeRow('url-row-${id}')">✕</button>`;
+  document.getElementById('url-list').appendChild(div);
+}
+
+function addCustomField(label, value) {
+  const id = cfCount++;
+  const div = document.createElement('div');
+  div.className='cf-row'; div.id='cf-row-'+id;
+  div.innerHTML=`<input class="cf-lbl" type="text" placeholder="Field name" value="${esc(label||'')}">
+    <textarea class="cf-val" rows="2" placeholder="Content...">${esc(value||'')}</textarea>
+    <button class="btn-remove" onclick="removeRow('cf-row-${id}')">✕</button>`;
+  document.getElementById('cf-list').appendChild(div);
+}
+
+function removeRow(id) { document.getElementById(id)?.remove(); }
+
+// ═══════════════════════════════════════════════════════════════
+//  FORM: READ / FILL / NEW
+// ═══════════════════════════════════════════════════════════════
+function readForm() {
+  const v = id => (document.getElementById(id)||{}).value||'';
+  return {
+    projectName:v('projectName'), projectNumber:v('projectNumber'),
+    customer:v('customer'), date:v('date'),
+    consultant:v('consultant'), consultantEmail:v('consultantEmail'), consultantPhone:v('consultantPhone'),
+    deliveryDescription:v('deliveryDescription'),
+    serverName:v('serverName'), programPaths:v('programPaths'),
+    startupInstructions:v('startupInstructions'),
+    configCredentials:v('configCredentials'), configConnectionStrings:v('configConnectionStrings'),
+    scheduledTasks:v('scheduledTasks'), credentialsUsed:v('credentialsUsed'),
+    dataFlow:v('dataFlow'),
+    urls:[...document.querySelectorAll('#url-list .url-row')].map(r=>({
+      label:r.querySelector('.url-desc').value,
+      url:r.querySelector('.url-href').value,
+    })),
+    customFields:[...document.querySelectorAll('#cf-list .cf-row')].map(r=>({
+      label:r.querySelector('.cf-lbl').value,
+      value:r.querySelector('.cf-val').value,
+    })),
+    volueConsultantName:v('volueConsultantName'), volueConsultantEmail:v('volueConsultantEmail'),
+    volueConsultantPhone:v('volueConsultantPhone'),
+    supportEmail:v('supportEmail'), supportPhone:v('supportPhone'),
+  };
+}
+
+function fillForm(d) {
+  const s=(id,val)=>{const e=document.getElementById(id);if(e)e.value=val||'';};
+  s('projectName',d.projectName); s('projectNumber',d.projectNumber);
+  s('customer',d.customer);       s('date',d.date);
+  s('consultant',d.consultant);   s('consultantEmail',d.consultantEmail); s('consultantPhone',d.consultantPhone);
+  s('deliveryDescription',d.deliveryDescription);
+  s('serverName',d.serverName);   s('programPaths',d.programPaths);
+  s('startupInstructions',d.startupInstructions);
+  s('configCredentials',d.configCredentials); s('configConnectionStrings',d.configConnectionStrings);
+  s('scheduledTasks',d.scheduledTasks); s('credentialsUsed',d.credentialsUsed);
+  s('dataFlow',d.dataFlow);
+  s('volueConsultantName',d.volueConsultantName||d.consultant);
+  s('volueConsultantEmail',d.volueConsultantEmail||d.consultantEmail);
+  s('volueConsultantPhone',d.volueConsultantPhone||d.consultantPhone);
+  s('supportEmail',d.supportEmail||APP_CONFIG.supportEmail);
+  s('supportPhone',d.supportPhone||APP_CONFIG.supportPhone);
+  document.getElementById('url-list').innerHTML=''; urlCount=0;
+  (d.urls||[{label:'',url:''}]).forEach(u=>addUrl(u.label,u.url));
+  document.getElementById('cf-list').innerHTML=''; cfCount=0;
+  (d.customFields||[]).forEach(c=>addCustomField(c.label,c.value));
+  updateFormTitle();
+}
+
+function updateFormTitle() {
+  const n = document.getElementById('projectName').value;
+  document.getElementById('form-title-text').textContent = n || tr('form_new');
+}
+
+function newDoc() {
+  currentId = null;
+  fillForm({urls:[{label:'',url:''}],customFields:[],
+    date:new Date().toISOString().slice(0,10),
+    supportEmail:APP_CONFIG.supportEmail, supportPhone:APP_CONFIG.supportPhone});
+  document.getElementById('form-title-text').textContent = tr('form_new');
+  hideAutofillBanner();
+  showView('form');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SAVE
+// ═══════════════════════════════════════════════════════════════
+async function saveDoc() {
+  showMsg(tr('t_save')+'…');
+  const d   = readForm();
+  const id  = currentId || 'doc_'+Date.now();
+  currentId = id;
+  const row = {
+    id,
+    project_name:    d.projectName,
+    project_number:  d.projectNumber,
+    customer:        d.customer,
+    consultant_name: d.consultant,
+    server_name:     d.serverName,
+    doc_date:        d.date,
+    data:            d,
+    saved_at:        new Date().toISOString(),
+  };
+  let ok = false;
+  if (sb) {
+    try {
+      const { error } = await sb.from(APP_CONFIG.supabaseTable).upsert(row);
+      if (error) throw error;
+      ok = true;
+    } catch(e) {
+      console.error('Supabase save error:', e);
+      showMsg('Supabase error – saved locally', true);
+    }
+  }
+  if (!ok) localStorage.setItem('dlv_'+id, JSON.stringify(row));
+  showMsg('✓ '+(ok?tr('supabase_ok'):tr('no_supabase')));
+  document.getElementById('form-title-text').textContent = d.projectName || tr('form_new');
+  await loadAllDocs();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LOAD
+// ═══════════════════════════════════════════════════════════════
+async function loadDoc(id) {
+  let row = allDocs.find(d=>d.id===id);
+  if (!row && sb) {
+    try {
+      const {data,error} = await sb.from(APP_CONFIG.supabaseTable).select('*').eq('id',id).single();
+      if (!error) row = data;
+    } catch {}
+  }
+  if (!row) { const r=localStorage.getItem('dlv_'+id); if(r) row=JSON.parse(r); }
+  if (!row) return;
+  currentId = id;
+  fillForm(row.data||row);
+  hideAutofillBanner();
+  showView('form');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PREVIEW RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderPreview() {
+  const d  = readForm();
+  const nv = s => s && s.trim()!=='';
+  const section = (key, html) => {
+    if (!html.trim()) return '';
+    return `<div class="doc-section">
+      <div class="doc-section-title">${esc(tr(key))}</div>${html}</div>`;
+  };
+  const row = (key, val, override) => {
+    if (!nv(val)) return '';
+    const label = override || tr(key);
+    return `<div class="doc-row">
+      <div class="doc-label">${esc(label)}</div>
+      <div class="doc-value">${esc(val)}</div></div>`;
+  };
+  const tech = [d.serverName,d.programPaths,d.startupInstructions,d.configCredentials,
+    d.configConnectionStrings,d.scheduledTasks,d.credentialsUsed].some(nv);
+  const consLine = [d.volueConsultantName||d.consultant, d.volueConsultantEmail||d.consultantEmail,
+    d.volueConsultantPhone||d.consultantPhone].filter(nv).join('  ·  ');
+  const urlsHtml = d.urls.filter(u=>nv(u.url)).map(u=>
+    `<div class="doc-url-row">${nv(u.label)?`<div class="doc-url-label">${esc(u.label)}</div>`:''}
+      <a href="${esc(u.url)}" target="_blank">${esc(u.url)}</a></div>`).join('');
+  const cfHtml = d.customFields.filter(c=>nv(c.value))
+    .map(c=>`<div class="doc-row"><div class="doc-label">${esc(c.label||'–')}</div>
+      <div class="doc-value">${esc(c.value)}</div></div>`).join('');
+  document.getElementById('preview-area').innerHTML = `
+    <div class="doc-header">
+      <div>
+        <div class="doc-brand">${esc(APP_CONFIG.companyName.toUpperCase())}</div>
+        <div class="doc-title">${esc(tr('doc_title'))}</div>
+        ${nv(d.projectName)?`<div class="doc-subtitle">${esc(d.projectName)}${nv(d.projectNumber)?' · #'+d.projectNumber:''}</div>`:''}
+      </div>
+      <div class="doc-meta">
+        <div class="doc-meta-date">${esc(d.date)}</div>
+        ${nv(d.customer)?`<div class="doc-meta-customer">${esc(d.customer)}</div>`:''}
+      </div>
+    </div>
+    ${section('prev_project',
+      row('row_project',d.projectName)+row('row_proj_num',d.projectNumber)+
+      row('row_customer',d.customer)+row('row_date',d.date)+
+      row('row_consultant',[d.consultant,d.consultantEmail,d.consultantPhone].filter(nv).join('  ·  ')))}
+    ${nv(d.deliveryDescription)?section('prev_delivery',
+      `<div class="doc-freetext">${esc(d.deliveryDescription)}</div>`):''}
+    ${tech?section('prev_tech',
+      row('row_server',d.serverName)+row('row_paths',d.programPaths)+
+      row('row_startup',d.startupInstructions)+row('row_config_cred',d.configCredentials)+
+      row('row_config_conn',d.configConnectionStrings)+row('row_scheduled',d.scheduledTasks)+
+      row('row_credentials',d.credentialsUsed)):''}
+    ${nv(d.dataFlow)?section('prev_dataflow',
+      `<div class="doc-freetext">${esc(d.dataFlow)}</div>`):''}
+    ${urlsHtml?section('prev_urls',urlsHtml):''}
+    ${cfHtml?`<div class="doc-section"><div class="doc-section-title">${esc(tr('prev_custom'))}</div>${cfHtml}</div>`:''}
+    ${section('prev_contact',
+      (nv(consLine)?`<div class="doc-row"><div class="doc-label">${esc(tr('row_contact'))}</div>
+        <div class="doc-value">${esc(consLine)}</div></div>`:'')+
+      row('row_support',[d.supportEmail,d.supportPhone].filter(nv).join('  ·  ')))}
+    <div class="doc-footer">
+      <span>© ${new Date().getFullYear()} ${esc(APP_CONFIG.companyName)} · ${esc(APP_CONFIG.companyWebsite)}</span>
+      <span class="doc-footer-brand">${esc(APP_CONFIG.companyName.toUpperCase())}</span>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let msgTimer;
+function showMsg(txt, isErr) {
+  const el=document.getElementById('save-msg');
+  el.textContent=txt; el.className='save-msg'+(isErr?' err':'');
+  clearTimeout(msgTimer);
+  if (!isErr) msgTimer=setTimeout(()=>{if(el.textContent===txt)el.textContent='';},4000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('supportEmail').value = APP_CONFIG.supportEmail;
+  document.getElementById('supportPhone').value  = APP_CONFIG.supportPhone;
+  setLang(lang);
+  initSupabase();
+  loadAllDocs();
+});
+</script>
+</body>
+</html>
