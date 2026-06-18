@@ -164,6 +164,28 @@ textarea{resize:vertical;line-height:1.6}
 .empty-state{text-align:center;padding:40px 0;color:#9eaabf;font-size:14px}
 .loading-state{text-align:center;padding:24px 0;color:#9eaabf;font-size:13px}
 
+
+/* ── BROWSER PANELS ── */
+.browser-panel{background:#fff;border:1px solid #dde3ec;border-radius:12px;overflow:hidden;margin-bottom:20px}
+.browser-panel-header{padding:14px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;transition:background .15s}
+.browser-panel-header:hover{background:#f9fafb}
+.browser-panel-header.open{border-bottom:1px solid #dde3ec}
+.browser-panel-title{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;color:#1c2b3a}
+.browser-panel-chevron{font-size:13px;color:#718099;transition:transform .2s}
+.browser-panel-chevron.open{transform:rotate(180deg)}
+.browser-panel-body{padding:16px 20px}
+.entity-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:4px}
+.entity-chip{background:#f7f8fa;border:1px solid #eef0f4;border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.entity-chip:hover{border-color:#1d9e75;background:#f0faf6}
+.entity-chip.active{border-color:#1d9e75;background:#e6f7f0;font-weight:600}
+.entity-chip-name{font-size:13px;color:#1c2b3a;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entity-chip-count{background:#1d9e75;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;flex-shrink:0}
+.entity-docs{margin-top:12px;padding-top:12px;border-top:1px solid #eef0f4;display:grid;gap:7px}
+.entity-doc-card{background:#f9fafb;border:1px solid #eef0f4;border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:space-between}
+.entity-doc-card:hover{border-color:#1d9e75;background:#f0faf6}
+.entity-doc-name{font-size:13px;font-weight:600;color:#1c2b3a;margin-bottom:2px}
+.entity-doc-meta{font-size:11px;color:#718099}
+.entity-empty{text-align:center;padding:20px;color:#9eaabf;font-size:13px}
 /* ── PRINT ── */
 @media print{
   #test-banner,.no-print{display:none!important}
@@ -251,6 +273,39 @@ textarea{resize:vertical;line-height:1.6}
         </div>
         <p class="search-hint" id="t-search-hint">Fuzzy search across project name, number, customer, consultant, server name and URLs.</p>
         <div id="search-results" class="search-results"></div>
+      </div>
+    </div>
+
+
+    <!-- Customer browser -->
+    <div class="browser-panel" id="customer-panel">
+      <div class="browser-panel-header" onclick="toggleBrowserPanel('customer')">
+        <div class="browser-panel-title">
+          <span>🏢</span>
+          <span id="t-customers-title">Customers</span>
+          <span id="customer-panel-count" style="font-size:12px;color:#718099;font-weight:400"></span>
+        </div>
+        <span class="browser-panel-chevron" id="customer-panel-chevron">▼</span>
+      </div>
+      <div class="browser-panel-body" id="customer-panel-body" style="display:none">
+        <div id="customer-grid" class="entity-grid"></div>
+        <div id="customer-docs"></div>
+      </div>
+    </div>
+
+    <!-- Consultant browser -->
+    <div class="browser-panel" id="consultant-panel">
+      <div class="browser-panel-header" onclick="toggleBrowserPanel('consultant')">
+        <div class="browser-panel-title">
+          <span>👤</span>
+          <span id="t-consultants-title">Consultants</span>
+          <span id="consultant-panel-count" style="font-size:12px;color:#718099;font-weight:400"></span>
+        </div>
+        <span class="browser-panel-chevron" id="consultant-panel-chevron">▼</span>
+      </div>
+      <div class="browser-panel-body" id="consultant-panel-body" style="display:none">
+        <div id="consultant-grid" class="entity-grid"></div>
+        <div id="consultant-docs"></div>
       </div>
     </div>
 
@@ -522,6 +577,8 @@ const T = {
     no_results:"No matching documents found.", form_new:"New Delivery Document",
     form_edit:"Edit Document", no_supabase:"Local storage", supabase_ok:"Connected",
     delete_confirm:"Delete this document?",
+    t_customers_title:"Customers", t_consultants_title:"Consultants",
+    t_doc_count:"documents", t_no_customers:"No customers yet.", t_no_consultants:"No consultants yet.", t_no_docs_yet:"No documents yet.",
   },
   no:{
     disclaimer:"Ikke legg inn konfidensielle data, passord eller reelle kundedata. Kun for testing.",
@@ -568,6 +625,8 @@ const T = {
     no_results:"Ingen treff.", form_new:"Nytt leveransedokument", form_edit:"Rediger dokument",
     no_supabase:"Lokal lagring", supabase_ok:"Tilkoblet",
     delete_confirm:"Slett dette dokumentet?",
+    t_customers_title:"Kunder", t_consultants_title:"Konsulenter",
+    t_doc_count:"dokumenter", t_no_customers:"Ingen kunder ennå.", t_no_consultants:"Ingen konsulenter ennå.", t_no_docs_yet:"Ingen dokumenter ennå.",
   },
   sv:{
     disclaimer:"Ange inte konfidentiell information, lösenord eller verklig kunddata. Endast för testning.",
@@ -956,6 +1015,11 @@ function renderRecent() {
   if (!recent.length) {
     el.innerHTML=`<div class="empty-state">${tr('t_loading')}</div>`; return;
   }
+  // Refresh browser panels if open
+  ['customer','consultant'].forEach(type => {
+    const body = document.getElementById(type+'-panel-body');
+    if (body && body.style.display !== 'none') renderBrowserPanel(type);
+  });
   el.innerHTML = recent.map(d => {
     const data = d.data||d;
     const name = d.project_name||data.projectName||'(Untitled)';
@@ -1354,6 +1418,133 @@ function renderPreview() {
     </div>`;
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+//  CUSTOMER & CONSULTANT BROWSERS
+// ═══════════════════════════════════════════════════════════════
+let activeBrowserSelections = { customer: null, consultant: null };
+
+function toggleBrowserPanel(type) {
+  const body    = document.getElementById(type + '-panel-body');
+  const chevron = document.getElementById(type + '-panel-chevron');
+  const header  = document.querySelector('#' + type + '-panel .browser-panel-header');
+  const open    = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  chevron.classList.toggle('open', !open);
+  header.classList.toggle('open', !open);
+  if (!open) renderBrowserPanel(type);
+}
+
+function renderBrowserPanel(type) {
+  if (type === 'customer') renderCustomerBrowser();
+  else renderConsultantBrowser();
+}
+
+function renderCustomerBrowser() {
+  const grid = document.getElementById('customer-grid');
+  const docsEl = document.getElementById('customer-docs');
+
+  // Build customer → docs map
+  const map = {};
+  allDocs.forEach(d => {
+    const cust = d.customer || (d.data && d.data.customer) || '';
+    if (!cust) return;
+    if (!map[cust]) map[cust] = [];
+    map[cust].push(d);
+  });
+
+  const customers = Object.keys(map).sort();
+  document.getElementById('customer-panel-count').textContent =
+    customers.length ? '(' + customers.length + ')' : '';
+
+  if (!customers.length) {
+    grid.innerHTML = `<div class="entity-empty">${tr('t_no_customers')}</div>`;
+    docsEl.innerHTML = '';
+    return;
+  }
+
+  const active = activeBrowserSelections.customer;
+  grid.innerHTML = customers.map(c => `
+    <div class="entity-chip ${c === active ? 'active' : ''}" onclick="selectBrowserEntity('customer','${esc(c)}')">
+      <span class="entity-chip-name" title="${esc(c)}">${esc(c)}</span>
+      <span class="entity-chip-count">${map[c].length}</span>
+    </div>`).join('');
+
+  if (active && map[active]) {
+    docsEl.innerHTML = renderEntityDocs(map[active]);
+  } else {
+    docsEl.innerHTML = '';
+  }
+}
+
+function renderConsultantBrowser() {
+  const grid = document.getElementById('consultant-grid');
+  const docsEl = document.getElementById('consultant-docs');
+
+  // Merge consultant table + docs
+  const map = {};
+  allDocs.forEach(d => {
+    const name = d.consultant_name || (d.data && d.data.consultant) || '';
+    if (!name) return;
+    if (!map[name]) map[name] = [];
+    map[name].push(d);
+  });
+
+  const names = [...new Set([
+    ...Object.keys(map),
+    ...consultantCache.map(c => c.name)
+  ])].sort();
+
+  document.getElementById('consultant-panel-count').textContent =
+    names.length ? '(' + names.length + ')' : '';
+
+  if (!names.length) {
+    grid.innerHTML = `<div class="entity-empty">${tr('t_no_consultants')}</div>`;
+    docsEl.innerHTML = '';
+    return;
+  }
+
+  const active = activeBrowserSelections.consultant;
+  grid.innerHTML = names.map(n => {
+    const count = (map[n] || []).length;
+    return `<div class="entity-chip ${n === active ? 'active' : ''}" onclick="selectBrowserEntity('consultant','${esc(n)}')">
+      <span class="entity-chip-name" title="${esc(n)}">${esc(n)}</span>
+      ${count ? `<span class="entity-chip-count">${count}</span>` : ''}
+    </div>`;
+  }).join('');
+
+  if (active && map[active]) {
+    docsEl.innerHTML = renderEntityDocs(map[active]);
+  } else {
+    docsEl.innerHTML = '';
+  }
+}
+
+function selectBrowserEntity(type, name) {
+  activeBrowserSelections[type] = activeBrowserSelections[type] === name ? null : name;
+  if (type === 'customer') renderCustomerBrowser();
+  else renderConsultantBrowser();
+}
+
+function renderEntityDocs(docs) {
+  if (!docs || !docs.length) return `<div class="entity-empty">${tr('t_no_docs_yet')}</div>`;
+  return '<div class="entity-docs">' + docs.map(d => {
+    const data = d.data || d;
+    const name = d.project_name || data.projectName || '(Untitled)';
+    const num  = d.project_number || data.projectNumber || '';
+    const dt   = d.doc_date || data.date || '';
+    const srv  = d.server_name || data.serverName || '';
+    const meta = [num ? '#'+num : '', dt, srv].filter(Boolean).join(' · ');
+    return `<div class="entity-doc-card" onclick="loadDoc('${d.id}')">
+      <div>
+        <div class="entity-doc-name">${esc(name)}</div>
+        <div class="entity-doc-meta">${esc(meta)}</div>
+      </div>
+      <span style="color:#9eaabf;font-size:16px">›</span>
+    </div>`;
+  }).join('') + '</div>';
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  UTILS
 // ═══════════════════════════════════════════════════════════════
@@ -1383,3 +1574,11 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+    t_customers_title:"Kunder", t_consultants_title:"Konsulter",
+    t_doc_count:"dokument", t_no_customers:"Inga kunder ännu.", t_no_consultants:"Inga konsulter ännu.", t_no_docs_yet:"Inga dokument ännu.",
+    t_customers_title:"Kunder", t_consultants_title:"Konsulenter",
+    t_doc_count:"dokumenter", t_no_customers:"Ingen kunder endnu.", t_no_consultants:"Ingen konsulenter endnu.", t_no_docs_yet:"Ingen dokumenter endnu.",
+    t_customers_title:"Kunden", t_consultants_title:"Berater",
+    t_doc_count:"Dokumente", t_no_customers:"Noch keine Kunden.", t_no_consultants:"Noch keine Berater.", t_no_docs_yet:"Noch keine Dokumente.",
+    t_customers_title:"Klienci", t_consultants_title:"Konsultanci",
+    t_doc_count:"dokumentów", t_no_customers:"Brak klientów.", t_no_consultants:"Brak konsultantów.", t_no_docs_yet:"Brak dokumentów.",
