@@ -470,6 +470,7 @@ const APP_CONFIG = {
   supabaseUrl:    'https://qznlbzmarhqjdxfykuca.supabase.co',
   supabaseKey:    'sb_publishable_LRXKNcS-8lPrMGHmLD72MA_jabdxNs0',
   supabaseTable:  'delivery_docs',
+  consultantsTable: 'consultants',
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -845,6 +846,7 @@ function applyTranslations() {
 //  DATA LOADING
 // ═══════════════════════════════════════════════════════════════
 async function loadAllDocs() {
+  if (sb && !consultantCache.length) loadConsultants();
   let docs = [];
   if (sb) {
     try {
@@ -1023,21 +1025,83 @@ function handleCustomerInput(val) {
   }, 200);
 }
 
+// ── CONSULTANT CACHE (loaded from consultants table) ──────────────
+let consultantCache = [];
+
+async function loadConsultants() {
+  if (!sb) return;
+  try {
+    const { data, error } = await sb.from(APP_CONFIG.consultantsTable)
+      .select('*').order('name');
+    if (!error && data) consultantCache = data;
+  } catch(e) { console.warn('Could not load consultants:', e); }
+}
+
 function handleConsultantInput(val) {
   clearTimeout(acDebounce);
   if (val.length < 2) { document.getElementById('consultant-ac').style.display='none'; return; }
   acDebounce = setTimeout(() => {
-    const consultants = getUniqueValues('consultant_name');
-    const fuse = new Fuse(consultants.map(c=>({v:c})), {keys:['v'],threshold:0.4});
+    // Search consultants table first, fall back to docs
+    const sources = consultantCache.length
+      ? consultantCache.map(c => c.name).filter(Boolean)
+      : getUniqueValues('consultant_name');
+    const fuse = new Fuse(sources.map(c=>({v:c})), {keys:['v'], threshold:0.4});
     const matches = val.length < 3
-      ? consultants.filter(c=>c.toLowerCase().startsWith(val.toLowerCase()))
-      : fuse.search(val).map(r=>r.item.v);
+      ? sources.filter(c => c.toLowerCase().startsWith(val.toLowerCase()))
+      : fuse.search(val).map(r => r.item.v);
     showAcDropdown('consultant-ac', matches, (selected) => {
       document.getElementById('consultant').value = selected;
       document.getElementById('consultant-ac').style.display='none';
-      suggestFromConsultant(selected);
+      prefillConsultant(selected);
     });
   }, 200);
+}
+
+function prefillConsultant(name) {
+  // Look up in consultant cache first
+  let email = '', phone = '';
+  const cached = consultantCache.find(c => c.name === name);
+  if (cached) {
+    email = cached.email || '';
+    phone = cached.phone || '';
+  } else {
+    // Fall back to existing docs
+    const match = allDocs.find(d =>
+      (d.consultant_name || (d.data && d.data.consultant)) === name);
+    if (match) {
+      const data = match.data || match;
+      email = data.consultantEmail || '';
+      phone = data.consultantPhone || '';
+    }
+  }
+  // Always fill both consultant sections
+  document.getElementById('consultantEmail').value      = email;
+  document.getElementById('consultantPhone').value      = phone;
+  document.getElementById('volueConsultantName').value  = name;
+  document.getElementById('volueConsultantEmail').value = email;
+  document.getElementById('volueConsultantPhone').value = phone;
+  if (email || phone) {
+    const detail = [email, phone].filter(Boolean).join(' · ');
+    showAutofillBanner(
+      `${tr('ac_existing_consultant')}: <strong>${esc(name)}</strong> — ${esc(detail)}`,
+      () => { hideAutofillBanner(); }
+    );
+  }
+}
+
+async function saveConsultantIfNew(name, email, phone) {
+  if (!sb || !name) return;
+  try {
+    const existing = consultantCache.find(c => c.name === name);
+    const row = {
+      id:    'cons_' + name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+      name,
+      email: email || '',
+      phone: phone || '',
+    };
+    await sb.from(APP_CONFIG.consultantsTable).upsert(row);
+    await loadConsultants(); // refresh cache
+  } catch(e) { console.warn('Could not save consultant:', e); }
 }
 
 function suggestFromCustomer(customerName) {
@@ -1049,34 +1113,8 @@ function suggestFromCustomer(customerName) {
   showAutofillBanner(
     `${tr('ac_existing_customer')}: <strong>${esc(customerName)}</strong>. ${tr('ac_use_consultant')}: <strong>${esc(cons)}</strong>`,
     () => {
-      document.getElementById('consultant').value         = cons;
-      document.getElementById('consultantEmail').value    = data.consultantEmail||'';
-      document.getElementById('consultantPhone').value    = data.consultantPhone||'';
-      document.getElementById('volueConsultantName').value = cons;
-      document.getElementById('volueConsultantEmail').value= data.consultantEmail||'';
-      document.getElementById('volueConsultantPhone').value= data.consultantPhone||'';
-      hideAutofillBanner();
-    }
-  );
-}
-
-function suggestFromConsultant(consultantName) {
-  const match = allDocs.find(d =>
-    (d.consultant_name||(d.data&&d.data.consultant)) === consultantName);
-  if (!match) return;
-  const data = match.data||match;
-  const email = data.consultantEmail||'';
-  const phone = data.consultantPhone||'';
-  if (!email && !phone) return;
-  const detail = [email,phone].filter(Boolean).join(' / ');
-  showAutofillBanner(
-    `${tr('ac_existing_consultant')}: <strong>${esc(consultantName)}</strong> — ${esc(detail)}`,
-    () => {
-      document.getElementById('consultantEmail').value     = email;
-      document.getElementById('consultantPhone').value     = phone;
-      document.getElementById('volueConsultantName').value = consultantName;
-      document.getElementById('volueConsultantEmail').value= email;
-      document.getElementById('volueConsultantPhone').value= phone;
+      document.getElementById('consultant').value = cons;
+      prefillConsultant(cons);
       hideAutofillBanner();
     }
   );
@@ -1225,6 +1263,10 @@ async function saveDoc() {
   if (!ok) localStorage.setItem('dlv_'+id, JSON.stringify(row));
   showMsg('✓ '+(ok?tr('supabase_ok'):tr('no_supabase')));
   document.getElementById('form-title-text').textContent = d.projectName || tr('form_new');
+  // Save consultant to consultants table
+  if (d.consultant) {
+    await saveConsultantIfNew(d.consultant, d.consultantEmail, d.consultantPhone);
+  }
   await loadAllDocs();
 }
 
@@ -1336,6 +1378,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setLang(lang);
   initSupabase();
   loadAllDocs();
+  loadConsultants();
 });
 </script>
 </body>
