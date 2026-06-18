@@ -186,6 +186,26 @@ textarea{resize:vertical;line-height:1.6}
 .entity-doc-name{font-size:13px;font-weight:600;color:#1c2b3a;margin-bottom:2px}
 .entity-doc-meta{font-size:11px;color:#718099}
 .entity-empty{text-align:center;padding:20px;color:#9eaabf;font-size:13px}
+
+/* ── LOCK BANNER ── */
+.lock-banner{border-radius:8px;padding:11px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;font-size:13px}
+.lock-banner.locked{background:#f0f4ff;border:1px solid #c7d2fe}
+.lock-banner.unlocked{background:#fefce8;border:1px solid #fde68a}
+.lock-banner-icon{font-size:18px;flex-shrink:0}
+.lock-banner-text{flex:1;color:#1c2b3a;font-weight:500}
+.lock-banner-text small{display:block;font-size:11px;color:#718099;font-weight:400;margin-top:1px}
+.form-locked input,.form-locked textarea{background:#f9fafb!important;color:#4b5563!important;cursor:not-allowed!important}
+.form-locked .btn-add,.form-locked .btn-remove{opacity:.35;pointer-events:none}
+.form-locked .url-row button,.form-locked .cf-row button{opacity:.35;pointer-events:none}
+
+/* ── LEAVE WARNING MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-box{background:#fff;border-radius:14px;padding:32px 28px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.modal-icon{font-size:36px;margin-bottom:12px}
+.modal-box h3{font-size:18px;font-weight:600;color:#1c2b3a;margin-bottom:10px}
+.modal-box p{font-size:14px;color:#718099;line-height:1.6;margin-bottom:24px}
+.modal-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
 /* ── PRINT ── */
 @media print{
   #test-banner,.no-print{display:none!important}
@@ -204,7 +224,7 @@ textarea{resize:vertical;line-height:1.6}
 
 <!-- ── TOPBAR ── -->
 <div class="topbar no-print">
-  <div class="topbar-left" onclick="showView('home')">
+  <div class="topbar-left" onclick="navigateAway('home')">
     <span class="brand" id="brand-name">MY COMPANY</span>
     <span class="topbar-appname" id="topbar-appname">Delivery Docs</span>
   </div>
@@ -325,12 +345,23 @@ textarea{resize:vertical;line-height:1.6}
   <div class="content">
 
     <div class="form-topbar no-print">
-      <button class="back-btn" onclick="showView('home')">← <span id="t-back-home">Back</span></button>
+      <button class="back-btn" onclick="navigateAway('home')">← <span id="t-back-home">Back</span></button>
       <span class="form-title" id="form-title-text">New Delivery Document</span>
     </div>
 
     <div class="english-note no-print" id="t-english-note">
       📌 Fill in field content in English — technical documentation is easier to search and share in one language.
+    </div>
+
+
+    <!-- Lock banner -->
+    <div id="lock-banner" class="lock-banner locked" style="display:none">
+      <span class="lock-banner-icon" id="lock-icon">🔒</span>
+      <div class="lock-banner-text">
+        <span id="lock-banner-text">This document is locked.</span>
+        <small id="lock-banner-sub">Click Edit to make changes.</small>
+      </div>
+      <button class="btn btn-teal" style="padding:6px 14px;font-size:12px" id="btn-edit-doc" onclick="unlockDoc()">✏️ <span id="t-edit-doc">Edit document</span></button>
     </div>
 
     <!-- Autofill banner (hidden by default) -->
@@ -493,8 +524,8 @@ textarea{resize:vertical;line-height:1.6}
     </div>
 
     <div class="form-footer no-print">
-      <button class="btn-outline" onclick="showView('home')">← <span id="t-cancel">Cancel</span></button>
-      <button class="btn btn-teal" onclick="saveDoc()" id="btn-save-doc" style="padding:8px 18px;font-size:13px">💾 <span id="t-save-doc">Save document</span></button>
+      <button class="btn-outline" onclick="navigateAway('home')" id="btn-form-back">← <span id="t-cancel">Cancel</span></button>
+      <button class="btn btn-teal" onclick="saveDoc()" id="btn-save-doc" style="padding:8px 18px;font-size:13px;display:none">💾 <span id="t-save-doc">Save document</span></button>
       <button class="btn-navy" onclick="showView('preview')" id="btn-preview-btn">👁 <span id="t-preview">Preview →</span></button>
     </div>
 
@@ -511,6 +542,20 @@ textarea{resize:vertical;line-height:1.6}
     <div class="preview-doc" id="preview-area"></div>
   </div>
 </div>
+
+<!-- ── LEAVE WARNING MODAL ── -->
+<div id="leave-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-icon">⚠️</div>
+    <h3 id="modal-title">Unsaved changes</h3>
+    <p id="modal-msg">You have unsaved changes. If you leave now, your changes will be lost.</p>
+    <div class="modal-actions">
+      <button class="btn-navy" id="modal-leave-btn">Leave without saving</button>
+      <button class="btn btn-teal" style="padding:8px 18px;font-size:13px" onclick="hideLeaveModal()">Stay and save</button>
+    </div>
+  </div>
+</div>
+
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -624,6 +669,24 @@ const T = {
     ac_use_consultant:"Bruk kontaktinfo?",
     no_results:"Ingen treff.", form_new:"Nytt leveransedokument", form_edit:"Rediger dokument",
     no_supabase:"Lokal lagring", supabase_ok:"Tilkoblet",
+    doc_locked_hint:"Dokumentet er låst.",
+    doc_locked_sub:"Klikk Rediger for å gjøre endringer.",
+    doc_editing_hint:"Redigeringsmodus — ulagrede endringer",
+    doc_editing_sub:"Husk å lagre når du er ferdig.",
+    btn_edit_doc:"Rediger dokument",
+    unsaved_title:"Ulagrede endringer",
+    unsaved_msg:"Du har ulagrede endringer. Hvis du forlater nå, vil endringene gå tapt.",
+    btn_leave:"Forlat uten å lagre",
+    btn_stay:"Bli og lagre",
+    doc_locked_hint:"This document is locked.",
+    doc_locked_sub:"Click Edit to make changes.",
+    doc_editing_hint:"Editing mode — unsaved changes",
+    doc_editing_sub:"Remember to save when done.",
+    btn_edit_doc:"Edit document",
+    unsaved_title:"Unsaved changes",
+    unsaved_msg:"You have unsaved changes. If you leave now, your changes will be lost.",
+    btn_leave:"Leave without saving",
+    btn_stay:"Stay and save",
     delete_confirm:"Slett dette dokumentet?",
     t_customers_title:"Kunder", t_consultants_title:"Konsulenter",
     t_doc_count:"dokumenter", t_no_customers:"Ingen kunder ennå.", t_no_consultants:"Ingen konsulenter ennå.", t_no_docs_yet:"Ingen dokumenter ennå.",
@@ -672,6 +735,15 @@ const T = {
     ac_use_consultant:"Använd kontaktuppgifter?",
     no_results:"Inga matchande dokument.", form_new:"Nytt leveransdokument", form_edit:"Redigera dokument",
     no_supabase:"Lokal lagring", supabase_ok:"Ansluten", delete_confirm:"Ta bort detta dokument?",
+    doc_locked_hint:"Dokumentet är låst.",
+    doc_locked_sub:"Klicka på Redigera för att göra ändringar.",
+    doc_editing_hint:"Redigeringsläge — osparade ändringar",
+    doc_editing_sub:"Kom ihåg att spara när du är klar.",
+    btn_edit_doc:"Redigera dokument",
+    unsaved_title:"Osparade ändringar",
+    unsaved_msg:"Du har osparade ändringar. Om du lämnar nu kommer ändringarna att gå förlorade.",
+    btn_leave:"Lämna utan att spara",
+    btn_stay:"Stanna och spara",
     t_customers_title:"Kunder", t_consultants_title:"Konsulter",
     t_no_customers:"Inga kunder ännu.", t_no_consultants:"Inga konsulter ännu.", t_no_docs_yet:"Inga dokument ännu.",
   },
@@ -719,6 +791,15 @@ const T = {
     ac_use_consultant:"Brug kontaktoplysninger?",
     no_results:"Ingen resultater.", form_new:"Nyt leverancedokument", form_edit:"Rediger dokument",
     no_supabase:"Lokal lagring", supabase_ok:"Forbundet", delete_confirm:"Slet dette dokument?",
+    doc_locked_hint:"Dokumentet er låst.",
+    doc_locked_sub:"Klik Rediger for at foretage ændringer.",
+    doc_editing_hint:"Redigeringstilstand — ugemte ændringer",
+    doc_editing_sub:"Husk at gemme når du er færdig.",
+    btn_edit_doc:"Rediger dokument",
+    unsaved_title:"Ugemte ændringer",
+    unsaved_msg:"Du har ugemte ændringer. Hvis du forlader nu, mistes ændringerne.",
+    btn_leave:"Forlad uden at gemme",
+    btn_stay:"Bliv og gem",
     t_customers_title:"Kunder", t_consultants_title:"Konsulenter",
     t_no_customers:"Ingen kunder endnu.", t_no_consultants:"Ingen konsulenter endnu.", t_no_docs_yet:"Ingen dokumenter endnu.",
   },
@@ -766,6 +847,15 @@ const T = {
     ac_use_consultant:"Kontaktdaten verwenden?",
     no_results:"Keine Ergebnisse.", form_new:"Neues Lieferdokument", form_edit:"Dokument bearbeiten",
     no_supabase:"Lokaler Speicher", supabase_ok:"Verbunden", delete_confirm:"Dieses Dokument löschen?",
+    doc_locked_hint:"Dieses Dokument ist gesperrt.",
+    doc_locked_sub:"Klicken Sie auf Bearbeiten, um Änderungen vorzunehmen.",
+    doc_editing_hint:"Bearbeitungsmodus — ungespeicherte Änderungen",
+    doc_editing_sub:"Denken Sie daran zu speichern, wenn Sie fertig sind.",
+    btn_edit_doc:"Dokument bearbeiten",
+    unsaved_title:"Ungespeicherte Änderungen",
+    unsaved_msg:"Sie haben ungespeicherte Änderungen. Wenn Sie jetzt verlassen, gehen diese verloren.",
+    btn_leave:"Verlassen ohne zu speichern",
+    btn_stay:"Bleiben und speichern",
     t_customers_title:"Kunden", t_consultants_title:"Berater",
     t_no_customers:"Noch keine Kunden.", t_no_consultants:"Noch keine Berater.", t_no_docs_yet:"Noch keine Dokumente.",
   },
@@ -813,6 +903,15 @@ const T = {
     ac_use_consultant:"Użyć danych kontaktowych?",
     no_results:"Brak wyników.", form_new:"Nowy dokument dostawy", form_edit:"Edytuj dokument",
     no_supabase:"Lokalne przechowywanie", supabase_ok:"Połączono", delete_confirm:"Usunąć ten dokument?",
+    doc_locked_hint:"Ten dokument jest zablokowany.",
+    doc_locked_sub:"Kliknij Edytuj, aby wprowadzić zmiany.",
+    doc_editing_hint:"Tryb edycji — niezapisane zmiany",
+    doc_editing_sub:"Pamiętaj o zapisaniu po zakończeniu.",
+    btn_edit_doc:"Edytuj dokument",
+    unsaved_title:"Niezapisane zmiany",
+    unsaved_msg:"Masz niezapisane zmiany. Jeśli wyjdziesz teraz, zmiany zostaną utracone.",
+    btn_leave:"Wyjdź bez zapisywania",
+    btn_stay:"Zostań i zapisz",
     t_customers_title:"Klienci", t_consultants_title:"Konsultanci",
     t_no_customers:"Brak klientów.", t_no_consultants:"Brak konsultantów.", t_no_docs_yet:"Brak dokumentów.",
   },
@@ -909,6 +1008,17 @@ function applyTranslations() {
   se('lbl-support-phone','lbl_support_phone');
   se('t-customers-title','t_customers_title');
   se('t-consultants-title','t_consultants_title');
+  se('t-edit-doc','btn_edit_doc');
+  // Update modal if visible
+  if (document.getElementById('leave-modal').style.display !== 'none') {
+    document.getElementById('modal-title').textContent = tr('unsaved_title');
+    document.getElementById('modal-msg').textContent   = tr('unsaved_msg');
+    document.getElementById('modal-leave-btn').textContent = tr('btn_leave');
+    const stayBtn = document.querySelector('#leave-modal .btn-teal');
+    if (stayBtn) stayBtn.textContent = tr('btn_stay');
+  }
+  // Re-apply lock banner text if visible
+  if (currentId) updateLockUI();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1296,11 +1406,14 @@ function updateFormTitle() {
 
 function newDoc() {
   currentId = null;
+  isLocked  = false;
+  isDirty   = false;
   fillForm({urls:[{label:'',url:''}],customFields:[],
     date:new Date().toISOString().slice(0,10),
     supportEmail:APP_CONFIG.supportEmail, supportPhone:APP_CONFIG.supportPhone});
   document.getElementById('form-title-text').textContent = tr('form_new');
   hideAutofillBanner();
+  updateLockUI();
   showView('form');
 }
 
@@ -1337,6 +1450,7 @@ async function saveDoc() {
   if (!ok) localStorage.setItem('dlv_'+id, JSON.stringify(row));
   showMsg('✓ '+(ok?tr('supabase_ok'):tr('no_supabase')));
   document.getElementById('form-title-text').textContent = d.projectName || tr('form_new');
+  lockDoc(); // Lock after successful save
   // Save consultant to consultants table
   if (d.consultant) {
     await saveConsultantIfNew(d.consultant, d.consultantEmail, d.consultantPhone);
@@ -1358,8 +1472,11 @@ async function loadDoc(id) {
   if (!row) { const r=localStorage.getItem('dlv_'+id); if(r) row=JSON.parse(r); }
   if (!row) return;
   currentId = id;
+  isLocked  = true;
+  isDirty   = false;
   fillForm(row.data||row);
   hideAutofillBanner();
+  updateLockUI();
   showView('form');
 }
 
@@ -1555,6 +1672,120 @@ function renderEntityDocs(docs) {
   }).join('') + '</div>';
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+//  LOCK & DIRTY STATE
+// ═══════════════════════════════════════════════════════════════
+let isLocked = false;
+let isDirty  = false;
+let pendingNavCallback = null;
+
+// Called on any form input change
+function markDirty() {
+  if (isLocked) return;
+  isDirty = true;
+}
+
+// Attach dirty listener to form view (event delegation)
+function attachDirtyListeners() {
+  const formView = document.getElementById('view-form');
+  formView.addEventListener('input', () => markDirty());
+  formView.addEventListener('change', () => markDirty());
+}
+
+function lockDoc() {
+  isLocked = true;
+  isDirty  = false;
+  updateLockUI();
+}
+
+function unlockDoc() {
+  isLocked = false;
+  updateLockUI();
+  // Focus first field
+  setTimeout(() => {
+    const el = document.getElementById('projectName');
+    if (el && !el.value) el.focus();
+  }, 50);
+}
+
+function updateLockUI() {
+  const formView = document.getElementById('view-form');
+  const banner   = document.getElementById('lock-banner');
+  const bannerTxt= document.getElementById('lock-banner-text');
+  const bannerSub= document.getElementById('lock-banner-sub');
+  const editBtn  = document.getElementById('btn-edit-doc');
+  const saveBtn  = document.getElementById('btn-save-doc');
+  const icon     = document.getElementById('lock-icon');
+
+  // Show banner only for existing docs
+  if (currentId) {
+    banner.style.display = 'flex';
+    if (isLocked) {
+      banner.className = 'lock-banner locked';
+      icon.textContent = '🔒';
+      bannerTxt.textContent = tr('doc_locked_hint');
+      bannerSub.textContent = tr('doc_locked_sub');
+      editBtn.style.display = 'inline-flex';
+      saveBtn.style.display = 'none';
+      formView.classList.add('form-locked');
+    } else {
+      banner.className = 'lock-banner unlocked';
+      icon.textContent = '🔓';
+      bannerTxt.textContent = tr('doc_editing_hint');
+      bannerSub.textContent = tr('doc_editing_sub');
+      editBtn.style.display = 'none';
+      saveBtn.style.display = 'inline-flex';
+      formView.classList.remove('form-locked');
+    }
+  } else {
+    // New document — no banner, save always visible
+    banner.style.display = 'none';
+    editBtn.style.display = 'none';
+    saveBtn.style.display = 'inline-flex';
+    formView.classList.remove('form-locked');
+  }
+
+  // Disable/enable all inputs
+  const inputs = formView.querySelectorAll('input, textarea');
+  inputs.forEach(el => { el.disabled = isLocked; });
+  const addBtns = formView.querySelectorAll('.btn-add, .btn-remove');
+  addBtns.forEach(el => { el.disabled = isLocked; });
+}
+
+// Navigation with dirty check
+function navigateAway(destination) {
+  if (isDirty && !isLocked) {
+    showLeaveModal(() => {
+      isDirty = false;
+      isLocked = false;
+      showView(destination);
+    });
+  } else {
+    isDirty = false;
+    showView(destination);
+  }
+}
+
+function showLeaveModal(onLeave) {
+  // Update modal text with current language
+  document.getElementById('modal-title').textContent   = tr('unsaved_title');
+  document.getElementById('modal-msg').textContent     = tr('unsaved_msg');
+  document.getElementById('modal-leave-btn').textContent = tr('btn_leave');
+  // Update stay button text
+  const stayBtn = document.querySelector('#leave-modal .btn-teal');
+  if (stayBtn) stayBtn.textContent = tr('btn_stay');
+  document.getElementById('modal-leave-btn').onclick = () => {
+    hideLeaveModal();
+    onLeave();
+  };
+  document.getElementById('leave-modal').style.display = 'flex';
+}
+
+function hideLeaveModal() {
+  document.getElementById('leave-modal').style.display = 'none';
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  UTILS
 // ═══════════════════════════════════════════════════════════════
@@ -1580,6 +1811,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSupabase();
   loadAllDocs();
   loadConsultants();
+  attachDirtyListeners();
 });
 </script>
 </body>
